@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Učitaj export · Nabava{% endblock %}
+{% block content %}
+
+<div class="max-w-xl">
+    <h1 class="text-2xl font-bold tracking-tight mb-1">Učitaj PAUK export</h1>
+    <p class="text-sm mb-5" style="color:var(--muted)">Excel se dodaje u arhivu i postaje aktivni prikaz. Prethodni ostaju sačuvani za povijesne grafove.</p>
+
+    {% if greska %}
+    <div class="card px-4 py-2.5 mb-4 text-sm" style="color:#a52427; background:#fdecec">{{ greska }}</div>
+    {% endif %}
+
+    <form method="post" action="/nabava/ucitaj" enctype="multipart/form-data"
+          class="card p-6" x-data="{ ime: null, ucitava: false }" @submit="ucitava = true">
+        <label class="block text-sm font-medium mb-2">Excel datoteka (IZVJEŠĆE STANJA MATERIJALA ...)</label>
+        <input type="file" name="datoteka" accept=".xlsx" required
+               class="block w-full text-sm border rounded-lg px-3 py-2 mb-4" style="border-color:var(--hairline)"
+               @change="ime = $event.target.files[0]?.name; $el.form.requestSubmit()">
+        <p class="text-xs mb-4" style="color:var(--muted)" x-show="ime" x-text="'Odabrano: ' + ime"></p>
+        <button type="submit" class="px-4 py-2 rounded-lg text-white font-semibold disabled:opacity-50"
+                style="background:var(--blue)" :disabled="ucitava">
+            <span x-show="!ucitava">Učitaj</span><span x-show="ucitava">Obrađujem...</span>
+        </button>
+    </form>
+</div>
+
+{% endblock %}

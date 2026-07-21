@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Uredi šifru' if a else 'Nova šifra' }} · Nabava{% endblock %}
+{% block content %}
+
+<a href="/nabava/sifre" class="text-sm hover:underline" style="color:var(--blue)">&larr; Natrag na popis šifri</a>
+
+<h1 class="text-2xl font-bold tracking-tight mt-2 mb-5">{{ 'Uredi šifru' if a else 'Nova šifra' }}</h1>
+
+{% if greska %}
+<div class="card px-4 py-2.5 mb-4 text-sm" style="color:#a52427; background:#fdecec">{{ greska }}</div>
+{% endif %}
+
+<form method="post" action="{{ '/nabava/sifre/' + a.id|string + '/uredi' if a else '/nabava/sifre/nova' }}"
+      class="card p-6 max-w-lg space-y-4" x-data="{ minTip: '{{ a.min_tip if a else 'BROJ' }}' }">
+
+    <div>
+        <label class="block text-sm font-medium mb-1">Kategorija</label>
+        <input list="kategorije" name="kategorija" required value="{{ a.kategorija if a else '' }}"
+               class="w-full border rounded-lg px-3 py-2 text-sm" style="border-color:var(--hairline)">
+        <datalist id="kategorije">{% for k in kategorije %}<option value="{{ k }}">{% endfor %}</datalist>
+        <p class="text-xs mt-1" style="color:var(--muted)">Upiši postojeću (padajući popis) ili novu kategoriju.</p>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium mb-1">Šifra</label>
+        <input type="text" name="sifra" required value="{{ a.sifra if a else '' }}"
+               class="w-full border rounded-lg px-3 py-2 text-sm mono" style="border-color:var(--hairline)">
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium mb-1">Minimum</label>
+        <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="min_tip" value="BROJ" x-model="minTip"> Broj:
+                <input type="text" name="min_broj" value="{{ a.min_broj if a and a.min_tip == 'BROJ' else '' }}"
+                       :disabled="minTip !== 'BROJ'"
+                       class="w-32 border rounded-lg px-2 py-1 text-sm disabled:bg-gray-100" style="border-color:var(--hairline)">
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="min_tip" value="POSITIVE" x-model="minTip"> POSITIVE (mora imati narudžbu &gt; 0)
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="min_tip" value="COMB_3" x-model="minTip"> COMB_3 (zbroj svih COMB_3 šifri &ge; 3)
+            </label>
+        </div>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium mb-1">Opis (nije obavezno)</label>
+        <input type="text" name="napomena" value="{{ a.napomena if a else '' }}"
+               class="w-full border rounded-lg px-3 py-2 text-sm" style="border-color:var(--hairline)">
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium mb-1">Redoslijed</label>
+        <input type="text" name="redoslijed" value="{{ a.redoslijed if a else sljedeci_redoslijed }}"
+               class="w-32 border rounded-lg px-3 py-2 text-sm" style="border-color:var(--hairline)">
+        <p class="text-xs mt-1" style="color:var(--muted)">Manji broj = ranije (unutar i između kategorija).</p>
+    </div>
+
+    <div class="pt-2">
+        <button type="submit" class="px-4 py-2 rounded-lg text-white font-semibold" style="background:var(--blue)">Spremi</button>
+        <a href="/nabava/sifre" class="ml-2 text-sm hover:underline" style="color:var(--muted)">Odustani</a>
+    </div>
+</form>
+
+{% endblock %}

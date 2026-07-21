@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Arhiva · Nabava{% endblock %}
+{% block content %}
+
+<h1 class="text-2xl font-bold tracking-tight mb-1">Arhiva uploada</h1>
+<p class="text-sm mb-5" style="color:var(--muted)">Svaki učitani PAUK export se čuva ovdje. Aktivni se prikazuje na nadzornoj ploči; povijest svih se koristi za povijesne grafove.</p>
+
+{% if not snapshoti %}
+<div class="card px-4 py-8 text-center" style="color:var(--muted)">
+    Još nema učitanih exporta. <a href="/nabava/ucitaj" class="underline" style="color:var(--blue)">Učitaj prvi</a>.
+</div>
+{% else %}
+<div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Datum exporta</th><th>Učitano</th><th>Datoteka</th>
+                <th class="r">Artikala</th><th></th><th class="r">Akcije</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in snapshoti %}
+            <tr>
+                <td class="num font-medium">{{ s.datum_exporta.strftime('%d.%m.%Y. %H:%M') if s.datum_exporta else '–' }}</td>
+                <td class="num" style="color:var(--ink-2)">{{ s.ucitano_at.strftime('%d.%m.%Y. %H:%M') }}</td>
+                <td class="truncate" style="max-width:20rem; color:var(--ink-2)">{{ s.izvor_naziv }}</td>
+                <td class="r num" style="color:var(--muted)">{{ broj_po_snap.get(s.id, 0) }}</td>
+                <td>{% if s.aktivan %}<span class="badge badge-info"><span class="dot"></span>aktivan</span>{% endif %}</td>
+                <td class="r whitespace-nowrap">
+                    {% if s.datoteka %}
+                    <a href="/nabava/arhiva/{{ s.id }}/preuzmi" class="underline mr-3" style="color:var(--blue)">preuzmi</a>
+                    {% else %}
+                    <span class="mr-3" style="color:var(--muted)" title="Sirovi Excel nije spremljen (v1 upload)">–</span>
+                    {% endif %}
+                    {% if not s.aktivan %}
+                    <form method="post" action="/nabava/arhiva/{{ s.id }}/aktiviraj" class="inline">
+                        <button type="submit" class="underline mr-3" style="color:var(--blue)">prikaži</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="/nabava/arhiva/{{ s.id }}/obrisi" class="inline"
+                          onsubmit="return confirm('Obrisati ovaj upload iz arhive? (briše i spremljeni Excel)');">
+                        <button type="submit" class="underline" style="color:var(--critical)">obriši</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}{{ a.sifra }} · Nabava{% endblock %}
+{% block content %}
+
+<a href="/nabava" class="text-sm hover:underline" style="color:var(--blue)">&larr; Natrag na nadzornu ploču</a>
+
+<div class="mt-2 mb-5 flex items-start justify-between flex-wrap gap-2">
+    <div>
+        <h1 class="text-xl font-bold mono tracking-tight">{{ a.sifra }}</h1>
+        <p style="color:var(--ink-2)">{{ stanje.naziv if stanje else '(nije pronađeno u trenutnom exportu)' }}</p>
+        <p class="text-xs mt-0.5" style="color:var(--muted)">{{ a.kategorija }} · dobavljač: {{ stanje.dobavljac if stanje else '–' }}</p>
+    </div>
+    <a href="/nabava/sifre/{{ a.id }}/uredi" class="text-sm px-3 py-1.5 rounded-lg border hover:bg-gray-50" style="border-color:var(--hairline)">Uredi šifru</a>
+</div>
+
+{% if not stanje %}
+<div class="card px-4 py-3 text-sm" style="color:#a9531f; background:#fdf1ea">
+    Ova šifra nije pronađena u zadnjem učitanom PAUK exportu (možda je preimenovana ili ukinuta u ERP-u).
+</div>
+{% else %}
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+    {% macro tile(label, val, color='var(--ink)') %}
+    <div class="card px-4 py-3">
+        <div class="text-xs" style="color:var(--muted)">{{ label }}</div>
+        <div class="text-xl font-bold num mt-0.5" style="color:{{ color }}">{{ val }}</div>
+    </div>
+    {% endmacro %}
+    {{ tile('Stanje', '%.2f'|format(stanje.stanje)) }}
+    {{ tile('Nak. RN', '%.2f'|format(stanje.nak_rn)) }}
+    {{ tile('Nak. Nar', '%.2f'|format(stanje.nak_nar)) }}
+    {{ tile('Min', ('%.0f'|format(a.min_broj)) if a.min_tip=='BROJ' else ('> 0' if a.min_tip=='POSITIVE' else 'Σ≥3')) }}
+    <div class="card px-4 py-3">
+        <div class="text-xs" style="color:var(--muted)">Status</div>
+        <div class="mt-1.5"><span class="badge badge-{{ stil.tip }}"><span class="dot"></span>{{ stil.oznaka }}</span></div>
+    </div>
+</div>
+
+{% if stanje.fali > 0 %}
+<div class="card px-4 py-2.5 mb-4 text-sm font-semibold flex items-center gap-2" style="color:#a52427; background:#fdecec">
+    <span class="badge badge-critical"><span class="dot"></span>naruči</span>
+    Treba naručiti: {% if a.min_tip in ('POSITIVE','COMB_3') %}HITNO{% else %}{{ '%.2f'|format(stanje.fali) }}{% endif %}
+</div>
+{% endif %}
+
+{% if a.min_tip == 'COMB_3' %}
+<div class="card px-4 py-2 mb-4 text-sm" style="color:#1f5aa8; background:var(--blue-soft)">
+    Dijeli zajednički minimum (zbroj Nak.Nar &ge; 3) sa: {{ sibling_krpe | join(', ') if sibling_krpe else '(nema drugih COMB_3 šifri)' }}. Zato graf nema liniju praga.
+</div>
+{% endif %}
+
+{% if stanje.odstupa_od_erp %}
+<div class="card px-4 py-2 mb-4 text-sm" style="color:#a9531f; background:#fdf1ea">
+    ⚠ Izračunata projekcija odstupa od ERP-ovog "Nak. Nar" - brojevi u tablici su točni, ali provjeri prije nego se osloniš samo na graf.
+</div>
+{% endif %}
+
+<div class="card p-4 mb-6">
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 class="font-semibold">Zaliha kroz vrijeme</h2>
+        <div class="flex items-center gap-3 text-xs flex-wrap" style="color:var(--muted)">
+            <span class="inline-flex items-center gap-1.5"><span style="display:inline-block;width:14px;height:2px;background:var(--blue)"></span>povijest</span>
+            <span class="inline-flex items-center gap-1.5"><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--blue)"></span>projekcija</span>
+            <span class="inline-flex items-center gap-1.5"><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--critical)"></span>minimum</span>
+        </div>
+    </div>
+    <div class="mb-2"><span class="text-xs" style="color:var(--muted)">kotačić = zoom · povuci = pomak (lijevo za stariju povijest) · dvoklik = reset</span></div>
+    <div style="position:relative;height:320px"><canvas id="graf"></canvas></div>
+</div>
+
+<h2 class="font-semibold mb-2">Događaji koji utječu na zalihu</h2>
+{% if not dogadjaji %}
+<p class="text-sm mb-8" style="color:var(--muted)">Nema poznatih budućih radnih naloga ni narudžbi za ovu šifru.</p>
+{% else %}
+<div class="card overflow-hidden mb-8">
+    <div class="overflow-x-auto">
+    <table class="data">
+        <thead><tr><th>Datum</th><th>Tip</th><th class="r">Količina</th><th>Izvor</th></tr></thead>
+        <tbody>
+            {% for d in dogadjaji %}
+            <tr>
+                <td class="num">{{ d.datum.strftime('%d.%m.%Y.') }}</td>
+                <td>{% if d.tip == 'TROSENJE' %}<span style="color:var(--critical)">trošenje</span>{% else %}<span style="color:var(--good)">dolazak</span>{% endif %}</td>
+                <td class="r num mono">{{ '%+.2f'|format(d.kolicina) }}</td>
+                <td style="color:var(--muted)">{{ d.izvor or '–' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script>
+const DT = luxon.DateTime;
+const ms = (iso) => DT.fromISO(iso).toMillis();          // ISO datum -> epoch ms
+const fmt = (m) => DT.fromMillis(m).toFormat('dd.MM.yy.');
+
+// Linearna os s epoch-ms (bez Chart.js date-adaptera - luxon samo za formatiranje).
+const povijest   = ({{ krivulja.povijest | tojson }}).map(p => ({x: ms(p.x), y: p.y}));
+const projekcija = ({{ krivulja.projekcija | tojson }}).map(p => ({x: ms(p.x), y: p.y}));
+const danasMs    = {{ krivulja.danas | tojson }} ? ms({{ krivulja.danas | tojson }}) : null;
+const minBroj    = {{ (a.min_broj if a.min_tip == 'BROJ' else none) | tojson }};
+
+const svi = povijest.concat(projekcija);
+if (svi.length) {
+    const DAN = 86400000;
+    const xMin = svi[0].x, xMax = svi[svi.length - 1].x;
+    const pad = Math.max(DAN, (xMax - xMin) * 0.02);
+
+    // DEFAULT pogled: fokus od zadnjeg stanja (danas) unaprijed na projekciju + malo
+    // konteksta unatrag - inace se cijela povijest (mjeseci) zbije i projekcija je necitljiva.
+    // Cijela povijest je i dalje dostupna povlacenjem lijevo ili gumbom "Cijela povijest".
+    const sidro = danasMs !== null ? danasMs : xMin;
+    const kontekst = 10 * DAN;                       // ~10 dana povijesti prije danas
+    const defMin = Math.max(xMin - pad, sidro - kontekst);
+    const defMax = xMax + pad;
+
+    const annots = {};
+    // vikendi (Sub 00:00 -> Pon 00:00) kao vertikalne trake (vidljive kad se zumira)
+    let cur = DT.fromMillis(xMin).startOf('day');
+    const kraj = DT.fromMillis(xMax).endOf('day');
+    while (cur <= kraj) {
+        if (cur.weekday === 6) annots['w' + cur.toMillis()] = {
+            type: 'box', xMin: cur.toMillis(), xMax: cur.toMillis() + 2*DAN,
+            backgroundColor: 'rgba(42,120,214,0.07)', borderWidth: 0, drawTime: 'beforeDatasetsDraw' };
+        cur = cur.plus({days: 1});
+    }
+    // "danas" - granica povijest/projekcija
+    if (danasMs !== null) annots['danas'] = {
+        type: 'line', xMin: danasMs, xMax: danasMs, borderColor: '#0b0b0b',
+        borderWidth: 1.5, borderDash: [4,3],
+        label: { display: true, content: 'danas', position: 'start',
+                 backgroundColor: '#0b0b0b', color: '#fff', font: {size: 10}, padding: 3 } };
+    if (minBroj !== null) annots['min'] = { type:'line', yMin:minBroj, yMax:minBroj,
+        borderColor:'#d03b3b', borderWidth:1.5, borderDash:[6,4] };
+    annots['nula'] = { type:'line', yMin:0, yMax:0, borderColor:'#c3c2b7', borderWidth:1 };
+
+    const graf = new Chart(document.getElementById('graf'), {
+        type: 'line',
+        data: { datasets: [
+            { label: 'Stvarno stanje (povijest)', data: povijest,
+              borderColor: '#2a78d6', backgroundColor: 'rgba(42,120,214,0.07)',
+              pointRadius: 3, pointBackgroundColor: '#2a78d6', borderWidth: 2, fill: true, tension: 0 },
+            { label: 'Projekcija', data: projekcija,
+              borderColor: '#2a78d6', borderDash: [5,4], pointRadius: 2,
+              pointBackgroundColor: '#2a78d6', borderWidth: 2, stepped: true, fill: false },
+        ]},
+        options: {
+            parsing: false,
+            maintainAspectRatio: false,
+            interaction: { mode: 'nearest', intersect: false },
+            scales: {
+                // pocetni pogled = FOKUS (zadnje stanje + projekcija). To je i "original" pa
+                // dvoklik (resetZoom) vraca ovamo. Pan/zoom limiti (nize) su CIJELI raspon pa
+                // se povlacenjem lijevo / odzumiranjem slobodno vidi starija povijest.
+                x: { type: 'linear', min: defMin, max: defMax,
+                     grid: { color: '#ecebe5' },
+                     ticks: { color: '#898781', font:{size:11}, maxTicksLimit: 9,
+                              callback: (v) => fmt(v) } },
+                y: { grid: { color: '#ecebe5' }, ticks: { color: '#898781', font:{size:11} },
+                     title: { display: true, text: 'Količina', color:'#898781' } },
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { title: (it) => DT.fromMillis(it[0].parsed.x).toFormat('dd.MM.yyyy.') } },
+                annotation: { annotations: annots },
+                zoom: {
+                    pan: { enabled: true, mode: 'x' },
+                    zoom: { wheel: { enabled: true, speed: 0.1 }, pinch: { enabled: true }, mode: 'x' },
+                    // limiti = CIJELI raspon podataka -> slobodan scroll/zoom do najstarije
+                    // povijesti; minRange sprjecava prezumiranje na jedan dan.
+                    limits: { x: { min: xMin - pad, max: xMax + pad, minRange: 3 * DAN } },
+                },
+            },
+        },
+    });
+
+    // dvoklik = reset na pocetni (fokus) pogled
+    document.getElementById('graf').addEventListener('dblclick', () => graf.resetZoom());
+}
+</script>
+
+{% endif %}
+{% endblock %}

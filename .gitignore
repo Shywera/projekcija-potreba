@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+nabava.db
+*.db
+backup/
+uploads/
+.pytest_cache/
