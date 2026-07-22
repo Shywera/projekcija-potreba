@@ -62,6 +62,7 @@
             <span class="inline-flex items-center gap-1.5"><span style="display:inline-block;width:14px;height:2px;background:var(--blue)"></span>povijest</span>
             <span class="inline-flex items-center gap-1.5"><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--blue)"></span>projekcija</span>
             <span class="inline-flex items-center gap-1.5"><span style="display:inline-block;width:14px;height:0;border-top:2px dashed var(--critical)"></span>minimum</span>
+            <span class="inline-flex items-center gap-1.5"><span style="display:inline-block;width:14px;height:11px;background:rgba(208,59,59,0.15)"></span>vikend</span>
         </div>
     </div>
     <div class="mb-2"><span class="text-xs" style="color:var(--muted)">kotačić = zoom · povuci = pomak (lijevo za stariju povijest) · dvoklik = reset</span></div>
@@ -128,7 +129,8 @@ if (svi.length) {
     while (cur <= kraj) {
         if (cur.weekday === 6) annots['w' + cur.toMillis()] = {
             type: 'box', xMin: cur.toMillis(), xMax: cur.toMillis() + 2*DAN,
-            backgroundColor: 'rgba(42,120,214,0.07)', borderWidth: 0, drawTime: 'beforeDatasetsDraw' };
+            // crvena, jasno vidljiva ali polu-prozirna (linije se citaju kroz nju)
+            backgroundColor: 'rgba(208,59,59,0.15)', borderWidth: 0, drawTime: 'beforeDatasetsDraw' };
         cur = cur.plus({days: 1});
     }
     // "danas" - granica povijest/projekcija
