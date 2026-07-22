@@ -179,7 +179,14 @@ def arhiva_obrisi(snap_id: int, db: Session = Depends(get_db)):
 def sifre_popis(request: Request, db: Session = Depends(get_db)):
     artikli = list(db.scalars(select(Artikl).order_by(Artikl.redoslijed)).all())
     grupe = service.grupiraj_po_kategoriji(artikli)
-    return templates.TemplateResponse(request, "nabava/sifre.html", {"grupe": grupe})
+    # nazivi dolaze iz aktivnog exporta (StanjeSnapshot), ne iz konfiguracije
+    snap = service.aktivni_snapshot(db)
+    naziv_po_id = {}
+    if snap:
+        naziv_po_id = {s.artikl_id: s.naziv for s in db.scalars(
+            select(StanjeSnapshot).where(StanjeSnapshot.snapshot_id == snap.id)).all()}
+    return templates.TemplateResponse(request, "nabava/sifre.html",
+                                      {"grupe": grupe, "naziv_po_id": naziv_po_id})
 
 
 @router.get("/sifre/nova", response_class=HTMLResponse)

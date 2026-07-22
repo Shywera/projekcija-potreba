@@ -87,47 +87,47 @@
 
 <!-- Svi artikli po kategorijama -->
 <h2 class="text-lg font-bold mb-3">Svi praćeni artikli</h2>
-<div class="space-y-4">
-    {% for kategorija, redci in grupe %}
-    <div class="card overflow-hidden">
-        <div class="px-4 py-2.5 font-semibold text-[13px] border-b" style="border-color:var(--hairline)">{{ kategorija }}</div>
-        <div class="overflow-x-auto">
-        <table class="data">
-            <thead>
-                <tr>
-                    <th>Šifra</th><th>Naziv</th><th class="r">Min</th><th class="r">Stanje</th>
-                    <th class="r">Nak. Nar</th><th class="r">Naruči</th><th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in redci %}
-                <tr class="klik" onclick="location.href='/nabava/artikl/{{ r.artikl.sifra }}'">
-                    <td class="mono text-xs" style="color:var(--ink-2)">{{ r.artikl.sifra }}</td>
-                    {% if not r.stanje %}
-                    <td colspan="6" class="italic" style="color:var(--serious)">nije pronađeno u ovom exportu</td>
-                    {% else %}
-                    <td class="truncate" style="max-width:22rem">{{ r.stanje.naziv }}</td>
-                    <td class="r num" style="color:var(--muted)">
-                        {% if r.artikl.min_tip == 'BROJ' %}{{ '%.0f'|format(r.artikl.min_broj) }}
-                        {% elif r.artikl.min_tip == 'POSITIVE' %}&gt; 0{% else %}Σ&ge;3{% endif %}
-                    </td>
-                    <td class="r num">{{ '%.2f'|format(r.stanje.stanje) }}</td>
-                    <td class="r num">{{ '%.2f'|format(r.stanje.nak_nar) }}</td>
-                    <td class="r num font-semibold {% if r.stanje.fali > 0 %}text-red-600{% endif %}">
-                        {{ '%.2f'|format(r.stanje.fali) if r.stanje.fali > 0 else '–' }}
-                    </td>
-                    <td>
-                        <span class="badge badge-{{ r.stil.tip }}"><span class="dot"></span>{{ r.stil.oznaka }}</span>
-                        {% if r.stanje.odstupa_od_erp %}<span class="ml-1" style="color:var(--warn)" title="Izračun odstupa od ERP nak.nar">⚠</span>{% endif %}
-                    </td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        </div>
+<div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="data fiksno" style="min-width:56rem">
+        <thead>
+            <tr>
+                <th style="width:9rem">Šifra</th><th>Naziv</th>
+                <th class="r" style="width:5rem">Min</th><th class="r" style="width:7rem">Stanje</th>
+                <th class="r" style="width:7rem">Nak. Nar</th><th class="r" style="width:6.5rem">Naruči</th>
+                <th style="width:12rem">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for kategorija, redci in grupe %}
+            <tr class="kat"><td colspan="7">{{ kategorija }}</td></tr>
+            {% for r in redci %}
+            <tr class="klik" onclick="location.href='/nabava/artikl/{{ r.artikl.sifra }}'">
+                <td class="mono text-xs" style="color:var(--ink-2)">{{ r.artikl.sifra }}</td>
+                {% if not r.stanje %}
+                <td colspan="6" class="italic" style="color:var(--serious)">nije pronađeno u ovom exportu</td>
+                {% else %}
+                <td class="truncate">{{ r.stanje.naziv }}</td>
+                <td class="r" style="color:var(--muted)">
+                    {% if r.artikl.min_tip == 'BROJ' %}{{ '%.0f'|format(r.artikl.min_broj) }}
+                    {% elif r.artikl.min_tip == 'POSITIVE' %}&gt; 0{% else %}Σ&ge;3{% endif %}
+                </td>
+                <td class="r num">{{ '%.2f'|format(r.stanje.stanje) }}</td>
+                <td class="r num">{{ '%.2f'|format(r.stanje.nak_nar) }}</td>
+                <td class="r num {% if r.stanje.fali > 0 %}text-red-600{% endif %}">
+                    {{ '%.2f'|format(r.stanje.fali) if r.stanje.fali > 0 else '–' }}
+                </td>
+                <td>
+                    <span class="badge badge-{{ r.stil.tip }}"><span class="dot"></span>{{ r.stil.oznaka }}</span>
+                    {% if r.stanje.odstupa_od_erp %}<span class="ml-1" style="color:var(--warn)" title="Izračun odstupa od ERP nak.nar">⚠</span>{% endif %}
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
     </div>
-    {% endfor %}
 </div>
 
 {% endif %}

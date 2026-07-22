@@ -10,37 +10,42 @@
     <a href="/nabava/sifre/nova" class="px-4 py-2 rounded-lg text-white font-semibold text-sm" style="background:var(--blue)">+ Nova šifra</a>
 </div>
 
-<div class="space-y-4">
-    {% for kategorija, artikli in grupe %}
-    <div class="card overflow-hidden">
-        <div class="px-4 py-2.5 font-semibold text-[13px] border-b" style="border-color:var(--hairline)">{{ kategorija }}</div>
-        <div class="overflow-x-auto">
-        <table class="data">
-            <thead><tr><th>Šifra</th><th>Min</th><th>Napomena</th><th class="r">Akcije</th></tr></thead>
-            <tbody>
-                {% for a in artikli %}
-                <tr>
-                    <td class="mono text-xs">{{ a.sifra }}</td>
-                    <td>
-                        {% if a.min_tip == 'BROJ' %}{{ '%.0f'|format(a.min_broj) }}
-                        {% elif a.min_tip == 'POSITIVE' %}&gt; 0{% else %}Σ&ge;3 (zajednički){% endif %}
-                    </td>
-                    <td style="color:var(--muted)">{{ a.napomena or '' }}</td>
-                    <td class="r whitespace-nowrap">
-                        <a href="/nabava/artikl/{{ a.sifra }}" class="underline mr-3" style="color:var(--blue)">graf</a>
-                        <a href="/nabava/sifre/{{ a.id }}/uredi" class="underline mr-3" style="color:var(--blue)">uredi</a>
-                        <form method="post" action="/nabava/sifre/{{ a.id }}/obrisi" class="inline"
-                              onsubmit="return confirm('Obrisati šifru {{ a.sifra }}?');">
-                            <button type="submit" class="underline" style="color:var(--critical)">obriši</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        </div>
+<div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="data fiksno" style="min-width:60rem">
+        <thead>
+            <tr>
+                <th style="width:9rem">Šifra</th><th>Naziv</th>
+                <th style="width:11rem">Min</th><th style="width:16rem">Napomena</th>
+                <th class="r" style="width:12rem">Akcije</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for kategorija, artikli in grupe %}
+            <tr class="kat"><td colspan="5">{{ kategorija }}</td></tr>
+            {% for a in artikli %}
+            <tr>
+                <td class="mono text-xs" style="color:var(--ink-2)">{{ a.sifra }}</td>
+                <td class="truncate">{{ naziv_po_id.get(a.id) or '' }}</td>
+                <td>
+                    {% if a.min_tip == 'BROJ' %}{{ '%.0f'|format(a.min_broj) }}
+                    {% elif a.min_tip == 'POSITIVE' %}&gt; 0{% else %}Σ&ge;3 (zajednički){% endif %}
+                </td>
+                <td style="color:var(--muted)">{{ a.napomena or '' }}</td>
+                <td class="r whitespace-nowrap">
+                    <a href="/nabava/artikl/{{ a.sifra }}" class="underline mr-3" style="color:var(--blue)">graf</a>
+                    <a href="/nabava/sifre/{{ a.id }}/uredi" class="underline mr-3" style="color:var(--blue)">uredi</a>
+                    <form method="post" action="/nabava/sifre/{{ a.id }}/obrisi" class="inline"
+                          onsubmit="return confirm('Obrisati šifru {{ a.sifra }}?');">
+                        <button type="submit" class="underline" style="color:var(--critical)">obriši</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
     </div>
-    {% endfor %}
 </div>
 
 {% endblock %}

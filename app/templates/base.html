@@ -46,13 +46,24 @@
         .nav-link .ico { width:17px; height:17px; flex:none; opacity:.85; }
 
         table.data { width:100%; border-collapse:collapse; font-size:13.5px; }
-        table.data thead th { text-align:left; font-weight:500; color:var(--muted);
-            padding:7px 12px; border-bottom:1px solid var(--hairline); font-size:12px;
-            text-transform:uppercase; letter-spacing:.03em; }
-        table.data tbody td { padding:9px 12px; border-bottom:1px solid #f2f1ee; }
+        table.data.fiksno { table-layout:fixed; }   /* postuje sirine stupaca; Naziv skracuje "..." */
+        table.data.fiksno td.truncate { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        table.data thead th { text-align:left; font-weight:600; color:var(--ink-2);
+            padding:8px 12px; border-bottom:1.5px solid var(--hairline); font-size:11.5px;
+            text-transform:uppercase; letter-spacing:.03em; background:#fafaf8; }
+        table.data thead th.r { text-align:right; }        /* brojcani header desno = iznad brojeva */
+        table.data tbody td { padding:8px 12px; border-bottom:1px solid #eeede9; }
+        table.data tbody td.r { text-align:right; }
+        table.data tbody td.num { color:var(--ink); font-weight:600;     /* brojevi tamni, kontrast */
+            font-variant-numeric:tabular-nums; }
         table.data tbody tr:last-child td { border-bottom:none; }
+        table.data tbody tr:nth-child(even of .klik) { background:#fbfbf9; }  /* blaga zebra */
         table.data tbody tr.klik { cursor:pointer; }
-        table.data tbody tr.klik:hover { background:#f8f8f5; }
+        table.data tbody tr.klik:hover { background:#eef4fd; }               /* jaci hover */
+        /* redak kategorije unutar jedne tablice (poravnanje headera i podataka zajamceno) */
+        table.data tbody tr.kat td { background:#eef0f3; color:var(--ink); font-weight:700;
+            font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; padding:7px 12px;
+            border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); }
         .r { text-align:right; } .mono { font-family: ui-monospace, "Cascadia Code", monospace; }
     </style>
 </head>
