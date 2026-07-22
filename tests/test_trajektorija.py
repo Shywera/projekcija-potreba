@@ -191,6 +191,24 @@ def test_stariji_export_ne_krade_aktivni(db, tmp_path, monkeypatch):
     assert akt.datum_exporta == datetime(2026, 7, 21, 8, 34)  # noviji ostao aktivan
 
 
+def test_pdf_izvoz(db):
+    """PDF izvoz (rekapitulacija + detalji) se generira i vraca ispravne PDF bajtove."""
+    a = Artikl(kategorija="TEST", redoslijed=10, sifra="X1", min_tip="BROJ", min_broj=100)
+    db.add(a); db.flush()
+    s = Snapshot(datum_exporta=datetime(2026, 7, 21), izvor_naziv="x.xlsx",
+                 ucitano_at=datetime(2026, 7, 21), aktivan=True)
+    db.add(s); db.flush()
+    db.add(StanjeSnapshot(snapshot_id=s.id, artikl_id=a.id, sifra="X1", naziv="Test artikl",
+                          dobavljac="Dobav d.o.o.", stanje=50, nak_nar=50, fali=50,
+                          status="PADA", prvi_pad_dani=5))
+    db.commit()
+    from app.modules.nabava import pdf as pdf_modul
+    data, naziv = pdf_modul.generiraj_pdf(db)
+    assert data[:4] == b"%PDF"        # ispravan PDF
+    assert len(data) > 1000
+    assert naziv.endswith(".pdf")
+
+
 def test_kombinirana_bez_povijesti_samo_projekcija(db):
     a = Artikl(kategorija="TEST", redoslijed=10, sifra="X2", min_tip="BROJ", min_broj=100)
     db.add(a); db.flush()

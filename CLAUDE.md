@@ -45,7 +45,10 @@ app/modules/nabava/
                            tocke_grafa, stil_statusa (semanticki tip za .badge-*), obradi_upload
                            (dedup + spremi file + AKUMULIRA), povijest_stanja, kombinirana_krivulja.
   routes.py                dashboard(?snapshot) / ucitaj / arhiva(preuzmi/aktiviraj/obrisi) /
-                           sifre (CRUD) / artikl/{sifra} (kombinirani graf).
+                           sifre (CRUD) / artikl/{sifra} (kombinirani graf) / pdf (izvoz).
+  pdf.py                   PDF izvjestaj "kao stari desktop" (fpdf2): rekapitulacija po
+                           dobavljacu + detalji po kategorijama sa statusom. Built-in Courier
+                           font -> _ascii() transliterira hr znakove (č->c...). Cita aktivni snapshot.
 app/templates/nabava/      base (paleta+badge stilovi) + dashboard + ucitaj + arhiva + detalj
                            (Chart.js+luxon) + sifre + sifre_forma.
 tests/test_trajektorija.py Scenarij iz razgovora + povijest/kombinirana krivulja + dedup (11 testova).

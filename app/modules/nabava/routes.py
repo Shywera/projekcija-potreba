@@ -1,13 +1,13 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.nabava import service
+from app.modules.nabava import pdf as pdf_modul, service
 from app.modules.nabava.models import Artikl, Dogadjaj, Snapshot, StanjeSnapshot
 
 router = APIRouter(prefix="/nabava", tags=["nabava"])
@@ -77,6 +77,17 @@ def dashboard(request: Request, snapshot: int | None = None, db: Session = Depen
         "ukupno_snapshota": ukupno_snapshota,
         "gleda_stari": bool(snapshot) and snap is not None and not snap.aktivan,
     })
+
+
+# ─── PDF izvoz (kao stari desktop izvjestaj) ────────────────────────────────
+
+@router.get("/pdf")
+def preuzmi_pdf(db: Session = Depends(get_db)):
+    if service.aktivni_snapshot(db) is None:
+        return PlainTextResponse("Nema ucitanih podataka za PDF.", status_code=404)
+    data, naziv = pdf_modul.generiraj_pdf(db)
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{naziv}"'})
 
 
 # ─── Upload ─────────────────────────────────────────────────────────────────
