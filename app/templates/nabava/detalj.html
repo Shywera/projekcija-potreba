@@ -14,7 +14,7 @@
 </div>
 
 {% if not stanje %}
-<div class="card px-4 py-3 text-sm" style="color:#a9531f; background:#fdf1ea">
+<div class="card px-4 py-3 text-sm" style="color:#7a3607; background:#fae3ce; border-color:#e0a86a">
     Ova šifra nije pronađena u zadnjem učitanom PAUK exportu (možda je preimenovana ili ukinuta u ERP-u).
 </div>
 {% else %}
@@ -26,9 +26,9 @@
         <div class="text-xl font-bold num mt-0.5" style="color:{{ color }}">{{ val }}</div>
     </div>
     {% endmacro %}
-    {{ tile('Stanje', '%.2f'|format(stanje.stanje)) }}
-    {{ tile('Nak. RN', '%.2f'|format(stanje.nak_rn)) }}
-    {{ tile('Nak. Nar', '%.2f'|format(stanje.nak_nar)) }}
+    {{ tile('Na skladištu', '%.2f'|format(stanje.stanje)) }}
+    {{ tile('Slobodno', '%.2f'|format(stanje.nak_rn)) }}
+    {{ tile('S naručenim', '%.2f'|format(stanje.nak_nar)) }}
     {{ tile('Min', ('%.0f'|format(a.min_broj)) if a.min_tip=='BROJ' else ('> 0' if a.min_tip=='POSITIVE' else 'Σ≥3')) }}
     <div class="card px-4 py-3">
         <div class="text-xs" style="color:var(--muted)">Status</div>
@@ -37,20 +37,20 @@
 </div>
 
 {% if stanje.fali > 0 %}
-<div class="card px-4 py-2.5 mb-4 text-sm font-semibold flex items-center gap-2" style="color:#a52427; background:#fdecec">
+<div class="card px-4 py-2.5 mb-4 text-sm font-semibold flex items-center gap-2" style="color:#8c1414; background:#f8d5d5; border-color:#e09a9a">
     <span class="badge badge-critical"><span class="dot"></span>naruči</span>
     Treba naručiti: {% if a.min_tip in ('POSITIVE','COMB_3') %}HITNO{% else %}{{ '%.2f'|format(stanje.fali) }}{% endif %}
 </div>
 {% endif %}
 
 {% if a.min_tip == 'COMB_3' %}
-<div class="card px-4 py-2 mb-4 text-sm" style="color:#1f5aa8; background:var(--blue-soft)">
+<div class="card px-4 py-2 mb-4 text-sm" style="color:#0a4489; background:var(--blue-soft); border-color:#9cc4ef">
     Dijeli zajednički minimum (zbroj Nak.Nar &ge; 3) sa: {{ sibling_krpe | join(', ') if sibling_krpe else '(nema drugih COMB_3 šifri)' }}. Zato graf nema liniju praga.
 </div>
 {% endif %}
 
 {% if stanje.odstupa_od_erp %}
-<div class="card px-4 py-2 mb-4 text-sm" style="color:#a9531f; background:#fdf1ea">
+<div class="card px-4 py-2 mb-4 text-sm" style="color:#7a3607; background:#fae3ce; border-color:#e0a86a">
     ⚠ Izračunata projekcija odstupa od ERP-ovog "Nak. Nar" - brojevi u tablici su točni, ali provjeri prije nego se osloniš samo na graf.
 </div>
 {% endif %}
@@ -147,11 +147,11 @@ if (svi.length) {
         type: 'line',
         data: { datasets: [
             { label: 'Stvarno stanje (povijest)', data: povijest,
-              borderColor: '#2a78d6', pointRadius: 3, pointBackgroundColor: '#2a78d6',
+              borderColor: '#0f5fc2', pointRadius: 3, pointBackgroundColor: '#0f5fc2',
               borderWidth: 2, fill: false, tension: 0 },
             { label: 'Projekcija', data: projekcija,
-              borderColor: '#2a78d6', borderDash: [5,4], pointRadius: 2,
-              pointBackgroundColor: '#2a78d6', borderWidth: 2, stepped: true, fill: false },
+              borderColor: '#0f5fc2', borderDash: [5,4], pointRadius: 2,
+              pointBackgroundColor: '#0f5fc2', borderWidth: 2, stepped: true, fill: false },
         ]},
         options: {
             parsing: false,

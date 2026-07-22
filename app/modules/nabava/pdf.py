@@ -11,7 +11,8 @@ from app.modules.nabava import service
 from app.modules.nabava.models import Artikl, Snapshot, StanjeSnapshot
 
 # sirine stupaca detaljne tablice (landscape A4, ~277mm iskoristivo)
-W = [40, 85, 16, 24, 24, 24, 64]  # Sifra, Naziv, Min, Stanje, Nak.Nar, Naruci, Status
+# Sifra, Naziv, Min, Na skladistu, Slobodno, S narucenim, Naruci, Status
+W = [38, 68, 14, 24, 22, 26, 22, 63]
 
 # boja statusa po semantickom tipu (ista paleta kao web badge)
 BOJA_TIP = {
@@ -46,11 +47,17 @@ class _PDF(FPDF):
         self.set_font("Courier", "", 8)
         self.set_text_color(110, 110, 110)
         self.cell(0, 5, f"Podaci iz PAUK exporta: {self._datum}", 0, 1, "C")
+        self.set_font("Courier", "", 7)
+        self.cell(0, 4, "Na skladistu = fizicki kod nas | Slobodno = nakon rezervacija za radne naloge"
+                        " | S narucenim = slobodno + vec naruceno (roba jos moze biti kod dobavljaca)",
+                  0, 1, "C")
         self.set_text_color(0)
-        self.ln(2)
+        self.ln(1)
         self.set_font("Courier", "B", 8)
-        self.set_fill_color(230, 230, 230)
-        for w, n in zip(W, [" Sifra", " Naziv", " Min", " Stanje", " Nak.Nar", " Naruci", " Status"]):
+        self.set_fill_color(210, 210, 210)
+        naslovi = [" Sifra", " Naziv", " Min", " Na skladistu", " Slobodno", " S narucenim",
+                   " Naruci", " Status"]
+        for w, n in zip(W, naslovi):
             self.cell(w, 8, n, 1, 0, "L", True)
         self.ln()
 
@@ -146,27 +153,28 @@ def _red_detalj(pdf, r):
     pdf.cell(W[0], 7, _ascii(f" {a.sifra}"), 1)
     if st is None:
         pdf.set_text_color(180, 90, 30)
-        pdf.cell(W[1] + W[2] + W[3] + W[4] + W[5] + W[6], 7, "  nije pronadjeno u ovom exportu", 1, 1)
+        pdf.cell(sum(W[1:]), 7, "  nije pronadjeno u ovom exportu", 1, 1)
         pdf.set_text_color(0)
         return
 
-    pdf.cell(W[1], 7, _ascii(f" {st.naziv}", 46), 1)
+    pdf.cell(W[1], 7, _ascii(f" {st.naziv}", 37), 1)
     min_s = ("%g" % a.min_broj) if a.min_tip == "BROJ" else (">0" if a.min_tip == "POSITIVE" else "Sum>=3")
     pdf.cell(W[2], 7, min_s, 1, 0, "C")
-    pdf.cell(W[3], 7, f"{st.stanje:,.2f}", 1, 0, "R")
-    pdf.cell(W[4], 7, f"{st.nak_nar:,.2f}", 1, 0, "R")
+    pdf.cell(W[3], 7, f"{st.stanje:,.2f}", 1, 0, "R")      # Na skladistu
+    pdf.cell(W[4], 7, f"{st.nak_rn:,.2f}", 1, 0, "R")      # Slobodno
+    pdf.cell(W[5], 7, f"{st.nak_nar:,.2f}", 1, 0, "R")     # S narucenim
 
     if st.fali > 0:
         pdf.set_text_color(200, 0, 0)
         val = f"{st.fali:,.2f}" if a.min_tip not in ("POSITIVE", "COMB_3") else "DA"
-        pdf.cell(W[5], 7, val, 1, 0, "C")
+        pdf.cell(W[6], 7, val, 1, 0, "C")
         pdf.set_text_color(0)
     else:
-        pdf.cell(W[5], 7, "-", 1, 0, "C")
+        pdf.cell(W[6], 7, "-", 1, 0, "C")
 
     if stil:
         pdf.set_text_color(*BOJA_TIP.get(stil["tip"], (0, 0, 0)))
-        pdf.cell(W[6], 7, _ascii(f" {stil['oznaka']}", 34), 1, 1, "L")
+        pdf.cell(W[7], 7, _ascii(f" {stil['oznaka']}", 33), 1, 1, "L")
         pdf.set_text_color(0)
     else:
-        pdf.cell(W[6], 7, "", 1, 1)
+        pdf.cell(W[7], 7, "", 1, 1)

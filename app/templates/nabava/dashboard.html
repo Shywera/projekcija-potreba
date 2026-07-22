@@ -25,13 +25,13 @@
 
 {% if gleda_stari %}
 <div class="mb-4 px-4 py-2.5 rounded-lg text-sm flex items-center justify-between gap-4"
-     style="background:var(--blue-soft); color:#1f5aa8">
+     style="background:var(--blue-soft); color:#0a4489; border:1px solid #9cc4ef">
     <span>Gledaš stariji upload iz arhive (samo za pregled).</span>
     <a href="/nabava" class="underline font-semibold whitespace-nowrap">Natrag na aktualni</a>
 </div>
 {% elif starost_sati is none or starost_sati >= 24 %}
 <div class="mb-4 px-4 py-2.5 rounded-lg text-sm flex items-center justify-between gap-4"
-     style="background:{% if starost_sati is none %}#fdf1ea; color:#a9531f{% else %}#fdecec; color:#a52427{% endif %}">
+     style="background:{% if starost_sati is none %}#fae3ce; color:#7a3607; border:1px solid #e0a86a{% else %}#f8d5d5; color:#8c1414; border:1px solid #e09a9a{% endif %}">
     <span>
         {% if starost_sati is none %}Datum exporta nije prepoznat - provjeri je li ovo ispravan PAUK export.
         {% else %}Podaci stari {{ (starost_sati / 24) | round(1) }} dan(a). Preporuka: učitaj svježi export.{% endif %}
@@ -63,7 +63,7 @@
 <!-- Rekapitulacija za nabavu -->
 <h2 class="text-lg font-bold mb-3">Rekapitulacija za nabavu</h2>
 {% if not rekap %}
-<div class="card px-4 py-3 mb-8 text-sm font-medium flex items-center gap-2" style="color:#1f7a1f">
+<div class="card px-4 py-3 mb-8 text-sm font-medium flex items-center gap-2" style="color:#0f5a0f">
     <span class="badge badge-ok"><span class="dot"></span>OK</span> Sve je na stanju. Nema potrebe za narudžbom.
 </div>
 {% else %}
@@ -72,9 +72,9 @@
     {% for r in rekap %}
         {% if r.stanje.dobavljac != ns.zadnji %}
             {% set ns.zadnji = r.stanje.dobavljac %}
-            <div class="px-4 py-2 text-[13px] font-semibold border-t first:border-t-0" style="background:#faf9f6; border-color:var(--hairline); color:var(--ink-2)">{{ r.stanje.dobavljac or '(nepoznat dobavljač)' }}</div>
+            <div class="px-4 py-2 text-[13px] font-semibold border-t first:border-t-0" style="background:#3f4753; color:#fff; letter-spacing:.04em">{{ r.stanje.dobavljac or '(nepoznat dobavljač)' }}</div>
         {% endif %}
-        <a href="/nabava/artikl/{{ r.artikl.sifra }}" class="flex items-center gap-3 px-4 py-2 text-sm border-t hover:bg-gray-50" style="border-color:#f2f1ee">
+        <a href="/nabava/artikl/{{ r.artikl.sifra }}" class="flex items-center gap-3 px-4 py-2 text-sm border-t hover:bg-gray-50" style="border-color:var(--linija)">
             <span class="mono text-xs" style="color:var(--muted)">{{ r.artikl.sifra }}</span>
             <span class="flex-1 truncate">{{ r.stanje.naziv }}</span>
             <span class="num font-semibold {% if r.artikl.min_tip in ('POSITIVE','COMB_3') %}text-red-600{% endif %}">
@@ -86,26 +86,35 @@
 {% endif %}
 
 <!-- Svi artikli po kategorijama -->
-<h2 class="text-lg font-bold mb-3">Svi praćeni artikli</h2>
+<h2 class="text-lg font-bold mb-1">Svi praćeni artikli</h2>
+<p class="text-xs mb-3" style="color:var(--muted)">
+    <b>Na skladištu</b> = fizički kod nas ·
+    <b>Slobodno</b> = nakon rezervacija za otvorene radne naloge ·
+    <b>S naručenim</b> = slobodno + već naručeno (roba još može biti kod dobavljača) ·
+    <b>Naruči</b> = koliko fali do minimuma
+</p>
 <div class="card overflow-hidden">
     <div class="overflow-x-auto">
-    <table class="data fiksno" style="min-width:56rem">
+    <table class="data fiksno" style="min-width:64rem">
         <thead>
             <tr>
                 <th style="width:9rem">Šifra</th><th>Naziv</th>
-                <th class="r" style="width:5rem">Min</th><th class="r" style="width:7rem">Stanje</th>
-                <th class="r" style="width:7rem">Nak. Nar</th><th class="r" style="width:6.5rem">Naruči</th>
-                <th style="width:12rem">Status</th>
+                <th class="r" style="width:4.5rem">Min</th>
+                <th class="r" style="width:7rem" title="Fizički na skladištu sada">Na skladištu</th>
+                <th class="r" style="width:7rem" title="Nakon rezervacija za otvorene radne naloge - stvarno raspoloživo kod nas">Slobodno</th>
+                <th class="r" style="width:7.5rem" title="Slobodno + već naručeno kod dobavljača (ta roba još NIJE kod nas)">S naručenim</th>
+                <th class="r" style="width:6rem" title="Koliko fali do minimuma (računa se od 'S naručenim')">Naruči</th>
+                <th style="width:11rem">Status</th>
             </tr>
         </thead>
         <tbody>
             {% for kategorija, redci in grupe %}
-            <tr class="kat"><td colspan="7">{{ kategorija }}</td></tr>
+            <tr class="kat"><td colspan="8">{{ kategorija }}</td></tr>
             {% for r in redci %}
             <tr class="klik" onclick="location.href='/nabava/artikl/{{ r.artikl.sifra }}'">
                 <td class="mono text-xs" style="color:var(--ink-2)">{{ r.artikl.sifra }}</td>
                 {% if not r.stanje %}
-                <td colspan="6" class="italic" style="color:var(--serious)">nije pronađeno u ovom exportu</td>
+                <td colspan="7" class="italic" style="color:var(--serious)">nije pronađeno u ovom exportu</td>
                 {% else %}
                 <td class="truncate">{{ r.stanje.naziv }}</td>
                 <td class="r" style="color:var(--muted)">
@@ -113,6 +122,7 @@
                     {% elif r.artikl.min_tip == 'POSITIVE' %}&gt; 0{% else %}Σ&ge;3{% endif %}
                 </td>
                 <td class="r num">{{ '%.2f'|format(r.stanje.stanje) }}</td>
+                <td class="r num">{{ '%.2f'|format(r.stanje.nak_rn) }}</td>
                 <td class="r num">{{ '%.2f'|format(r.stanje.nak_nar) }}</td>
                 <td class="r num {% if r.stanje.fali > 0 %}text-red-600{% endif %}">
                     {{ '%.2f'|format(r.stanje.fali) if r.stanje.fali > 0 else '–' }}

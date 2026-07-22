@@ -8,17 +8,19 @@
     <script defer src="https://unpkg.com/alpinejs@3/dist/cdn.min.js"></script>
     <style>
         :root {
-            --page: #f6f6f3;
+            /* JAK KONTRAST - tamni tekst, vidljive linije, duboka plava */
+            --page: #e9ebee;
             --surface: #ffffff;
-            --ink: #0b0b0b;
-            --ink-2: #52514e;
-            --muted: #898781;
-            --hairline: rgba(11,11,11,0.09);
-            --grid: #e6e5df;
-            --blue: #2a78d6;
-            --blue-soft: #eef4fd;
-            /* status (dataviz paleta) */
-            --good: #0ca30c; --serious: #ec835a; --critical: #d03b3b; --warn: #fab219;
+            --ink: #0d0d0d;
+            --ink-2: #2e2d2a;          /* sekundarni tekst - tamno, citljivo */
+            --muted: #56554f;          /* "prigusen" ali i dalje jasno citljiv */
+            --hairline: rgba(0,0,0,0.22);   /* vidljivi rubovi kartica/tablica */
+            --linija: #d3d1c9;         /* separator redaka */
+            --grid: #d5d3cb;
+            --blue: #0f5fc2;           /* duboka plava (bila preblijeda) */
+            --blue-soft: #d7e7fb;
+            /* status - tamnije verzije = veci kontrast na bijelom */
+            --good: #0a7a0a; --serious: #c2570f; --critical: #c01f1f; --warn: #a97400;
         }
         html, body { background: var(--page); color: var(--ink);
             font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -26,44 +28,48 @@
         .num { font-variant-numeric: tabular-nums; }
 
         .card { background: var(--surface); border: 1px solid var(--hairline);
-            border-radius: 14px; box-shadow: 0 1px 2px rgba(11,11,11,0.04); }
+            border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.10); }
 
-        /* status badge: pill + tockica + tekst (nikad boja sama) */
-        .badge { display:inline-flex; align-items:center; gap:6px; padding:2px 9px;
-            border-radius:999px; font-size:12px; font-weight:600; line-height:1.4;
+        /* status badge: alarmi SOLID (jako vidljivi), mirna stanja tonirana */
+        .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px;
+            border-radius:999px; font-size:12px; font-weight:700; line-height:1.4;
             white-space:nowrap; }
         .badge .dot { width:7px; height:7px; border-radius:999px; flex:none; }
-        .badge-critical { background:#fdecec; color:#a52427; } .badge-critical .dot{ background:var(--critical); }
-        .badge-serious  { background:#fdf1ea; color:#a9531f; } .badge-serious .dot{ background:var(--serious); }
-        .badge-info     { background:#eaf2fc; color:#1f5aa8; } .badge-info .dot{ background:var(--blue); }
-        .badge-ok       { background:#e9f6e9; color:#1f7a1f; } .badge-ok .dot{ background:var(--good); }
-        .badge-muted    { background:#f0efec; color:#6b6a66; } .badge-muted .dot{ background:#b4b3ad; }
+        .badge-critical { background:var(--critical); color:#fff; } .badge-critical .dot{ background:#fff; }
+        .badge-serious  { background:var(--serious);  color:#fff; } .badge-serious .dot{ background:#fff; }
+        .badge-info     { background:var(--blue-soft); color:#0a4489; border:1px solid #9cc4ef; }
+        .badge-info .dot{ background:var(--blue); }
+        .badge-ok       { background:#d9edd9; color:#0f5a0f; border:1px solid #9fce9f; }
+        .badge-ok .dot{ background:var(--good); }
+        .badge-muted    { background:#dedcd5; color:#3f3e39; border:1px solid #bdbbb2; }
+        .badge-muted .dot{ background:#6f6e68; }
 
-        .nav-link { display:flex; align-items:center; gap:9px; margin:1px 10px; padding:7px 11px;
-            border-radius:9px; font-size:13.5px; color:var(--ink-2); transition:background .12s,color .12s; }
-        .nav-link:hover { background:#f1f1ee; color:var(--ink); }
-        .nav-link.active { background:var(--blue-soft); color:var(--blue); font-weight:600; }
-        .nav-link .ico { width:17px; height:17px; flex:none; opacity:.85; }
+        .nav-link { display:flex; align-items:center; gap:9px; margin:1px 10px; padding:8px 11px;
+            border-radius:8px; font-size:14px; font-weight:500; color:var(--ink-2);
+            transition:background .12s,color .12s; }
+        .nav-link:hover { background:#dfe2e6; color:var(--ink); }
+        .nav-link.active { background:var(--blue); color:#fff; font-weight:700; }  /* solid = jasno */
 
         table.data { width:100%; border-collapse:collapse; font-size:13.5px; }
         table.data.fiksno { table-layout:fixed; }   /* postuje sirine stupaca; Naziv skracuje "..." */
         table.data.fiksno td.truncate { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        table.data thead th { text-align:left; font-weight:600; color:var(--ink-2);
-            padding:8px 12px; border-bottom:1.5px solid var(--hairline); font-size:11.5px;
-            text-transform:uppercase; letter-spacing:.03em; background:#fafaf8; }
+        table.data thead th { text-align:left; font-weight:700; color:var(--ink);
+            padding:9px 12px; border-bottom:2px solid #a9a79e; font-size:11.5px;
+            text-transform:uppercase; letter-spacing:.03em; background:#dfe2e6; }
         table.data thead th.r { text-align:right; }        /* brojcani header desno = iznad brojeva */
-        table.data tbody td { padding:8px 12px; border-bottom:1px solid #eeede9; }
+        table.data tbody td { padding:8px 12px; border-bottom:1px solid var(--linija);
+            color:var(--ink-2); }
         table.data tbody td.r { text-align:right; }
-        table.data tbody td.num { color:var(--ink); font-weight:600;     /* brojevi tamni, kontrast */
+        table.data tbody td.num { color:var(--ink); font-weight:700;     /* brojevi najtamniji */
             font-variant-numeric:tabular-nums; }
         table.data tbody tr:last-child td { border-bottom:none; }
-        table.data tbody tr:nth-child(even of .klik) { background:#fbfbf9; }  /* blaga zebra */
+        table.data tbody tr:nth-child(even of .klik) { background:#f2f3f5; }  /* vidljiva zebra */
         table.data tbody tr.klik { cursor:pointer; }
-        table.data tbody tr.klik:hover { background:#eef4fd; }               /* jaci hover */
+        table.data tbody tr.klik:hover { background:var(--blue-soft); }      /* jasan hover */
         /* redak kategorije unutar jedne tablice (poravnanje headera i podataka zajamceno) */
-        table.data tbody tr.kat td { background:#eef0f3; color:var(--ink); font-weight:700;
-            font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; padding:7px 12px;
-            border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); }
+        table.data tbody tr.kat td { background:#3f4753; color:#fff; font-weight:700;
+            font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; padding:7px 12px;
+            border-top:none; border-bottom:none; }
         .r { text-align:right; } .mono { font-family: ui-monospace, "Cascadia Code", monospace; }
     </style>
 </head>
