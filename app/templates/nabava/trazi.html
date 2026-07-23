@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Traži · Nabava{% endblock %}
+{% block content %}
+
+<h1 class="text-2xl font-bold tracking-tight mb-1">Traži materijal</h1>
+<p class="text-sm mb-4" style="color:var(--muted)">
+    Pretražuje <b>sve materijale</b> iz zadnjeg PAUK exporta (ne samo praćene). Upiši šifru ili dio naziva pa otvori graf.
+</p>
+
+<form method="get" action="/nabava/trazi" class="card p-4 mb-5 flex gap-2 flex-wrap items-center">
+    <input type="text" name="q" value="{{ q }}" autofocus placeholder="npr. 501050100002 ili &quot;offset&quot;"
+           class="flex-1 border rounded-lg px-3 py-2 text-sm" style="border-color:var(--hairline); min-width:18rem">
+    <button type="submit" class="px-4 py-2 rounded-lg text-white font-semibold text-sm" style="background:var(--blue)">Traži</button>
+</form>
+
+{% if not snapshot %}
+<div class="card px-4 py-3 text-sm" style="color:#7a3607; background:#fae3ce; border-color:#e0a86a">
+    Nema učitanih podataka. <a href="/nabava/ucitaj" class="underline">Učitaj PAUK export</a> pa pokušaj ponovno.
+</div>
+{% elif q and not rezultati %}
+<div class="card px-4 py-6 text-center" style="color:var(--muted)">
+    Nema materijala koji odgovara "<b>{{ q }}</b>" u exportu od
+    {{ snapshot.datum_exporta.strftime('%d.%m.%Y.') if snapshot.datum_exporta else '(nepoznat datum)' }}.
+</div>
+{% elif rezultati %}
+<p class="text-xs mb-2" style="color:var(--muted)">
+    Nađeno {{ rezultati|length }}{% if previse %}+ (prikazano prvih 200 - suzi pretragu){% endif %}
+    · export {{ snapshot.datum_exporta.strftime('%d.%m.%Y. %H:%M') if snapshot.datum_exporta else '' }}
+</p>
+<div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="data fiksno" style="min-width:62rem">
+        <thead>
+            <tr>
+                <th style="width:9rem">Šifra</th><th>Naziv</th>
+                <th class="r" style="width:7rem">Na skladištu</th>
+                <th class="r" style="width:7rem">Slobodno</th>
+                <th class="r" style="width:7.5rem">S naručenim</th>
+                <th style="width:11rem">Status</th>
+                <th style="width:7rem">Praćen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rezultati %}
+            <tr class="klik" onclick="location.href='/nabava/artikl/{{ r.st.sifra }}'">
+                <td class="mono text-xs" style="color:var(--ink-2)">{{ r.st.sifra }}</td>
+                <td class="truncate">{{ r.st.naziv }}</td>
+                <td class="r num">{{ '%.2f'|format(r.st.stanje) }}</td>
+                <td class="r num">{{ '%.2f'|format(r.st.nak_rn) }}</td>
+                <td class="r num">{{ '%.2f'|format(r.st.nak_nar) }}</td>
+                <td><span class="badge badge-{{ r.stil.tip }}"><span class="dot"></span>{{ r.stil.oznaka }}</span></td>
+                <td>
+                    {% if r.praceni %}<span class="badge badge-info"><span class="dot"></span>da</span>
+                    {% else %}<span style="color:var(--muted)">–</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

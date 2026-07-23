@@ -76,15 +76,17 @@ def generiraj_pdf(db: Session) -> tuple[bytes, str]:
                  if snap and snap.datum_exporta else "(nepoznat)")
 
     artikli = list(db.scalars(select(Artikl).order_by(Artikl.redoslijed)).all())
+    # kljuc po SIFRI (snapshot sadrzi i materijale izvan popisa, kojima je artikl_id None)
     stanja = {}
-    if snap:
-        stanja = {s.artikl_id: s for s in db.scalars(
-            select(StanjeSnapshot).where(StanjeSnapshot.snapshot_id == snap.id)).all()}
+    if snap and artikli:
+        stanja = {s.sifra: s for s in db.scalars(
+            select(StanjeSnapshot).where(StanjeSnapshot.snapshot_id == snap.id,
+                                          StanjeSnapshot.sifra.in_([a.sifra for a in artikli]))).all()}
 
     # redci: artikl + stanje + stil (status)
     redci = []
     for a in artikli:
-        st = stanja.get(a.id)
+        st = stanja.get(a.sifra)
         stil = service.stil_statusa(st.status, st.prvi_pad_dani, st.oporavlja_li_se) if st else None
         redci.append({"artikl": a, "kategorija": a.kategorija, "stanje": st, "stil": stil})
 

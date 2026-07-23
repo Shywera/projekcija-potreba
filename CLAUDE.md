@@ -34,9 +34,9 @@ app/main.py                FastAPI: create_all + _migracija() (idempotentni ALTE
                            /backup, / -> /nabava. BEZ auth-a (svjesno, vidi dolje).
 app/core/                  config (pydantic-settings, .env) + database + backup (isto kao braća).
 app/modules/nabava/
-  models.py                Artikl (konfiguracija), Snapshot (POVIJEST uploada + datoteka/aktivan),
-                           StanjeSnapshot (izracunato po snapshotu, AKUMULIRA), Dogadjaj
-                           (vremenska linija - samo aktivni snapshot).
+  models.py                Artikl (konfiguracija = 52 pracena), Snapshot (POVIJEST uploada +
+                           datoteka/aktivan), StanjeSnapshot + Dogadjaj (po snapshotu, za SVE
+                           materijale iz exporta ~1400; artikl_id NULLABLE, kljuc je SIFRA).
   seed.py                  KATEGORIJE_BASE (63 artikla / 13 kat.) + seed u praznu bazu.
   pauk.py                  NISKI NIVO citanja PAUK exporta - doslovan prijenos indeksa
                            stupaca i normalizacije iz desktop alata (0.4). NE prepisivati
@@ -44,8 +44,9 @@ app/modules/nabava/
   service.py               PRAVA logika: fali, projekcija_puna (trosenje+dolazak+oporavak),
                            tocke_grafa, stil_statusa (semanticki tip za .badge-*), obradi_upload
                            (dedup + spremi file + AKUMULIRA), povijest_stanja, kombinirana_krivulja.
-  routes.py                dashboard(?snapshot) / ucitaj / arhiva(preuzmi/aktiviraj/obrisi) /
-                           sifre (CRUD) / artikl/{sifra} (kombinirani graf) / pdf (izvoz).
+  routes.py                dashboard(?snapshot) / trazi (pretraga SVIH materijala) / ucitaj /
+                           arhiva(preuzmi/aktiviraj/obrisi) / sifre (CRUD) / artikl/{sifra}
+                           (kombinirani graf, radi i za NEpracene) / pdf (izvoz).
   pdf.py                   PDF izvjestaj "kao stari desktop" (fpdf2): rekapitulacija po
                            dobavljacu + detalji po kategorijama sa statusom. Built-in Courier
                            font -> _ascii() transliterira hr znakove (č->c...). Cita aktivni snapshot.
@@ -70,6 +71,24 @@ uploads/                   spremljeni sirovi .xlsx exporti (gitignore) - jedan p
 - **provjeri_odstupanje**: obrambeni self-check - zavrsna bilanca simulacije vs nak_nar iz
   ERP-a (razlicit put racuna). Tolerancija relativna (2%) + apsolutni pod (5), jer se na
   stvarnim podacima poklapaju do na sitni sum per-row clippanja. Odstupanje -> suptilna ⚠.
+
+## v3: svi materijali + pretraga (bitno)
+- StanjeSnapshot/Dogadjaj se spremaju za **SVE materijale iz exporta** (~1400), ne samo 52
+  pracena -> `/nabava/trazi` moze naci bilo koju sifru/naziv i nacrtati joj graf.
+- Zato je `artikl_id` NULLABLE (materijal izvan popisa nema Artikl red). **Kljuc je SIFRA** -
+  nikad ne kljucaj mape po artikl_id (svi nepraceni bi se sudarili na None). Vidi dashboard/
+  sifre/pdf rute: `{s.sifra: s}`.
+- `dogadjaji_po_sifri()` racuna sve dogadjaje u JEDNOM prolazu i grupira po sifri. NE vracati
+  se na `dogadjaji_za_sifru()` u petlji po materijalima - to filtrira cijeli DataFrame po
+  svakoj sifri (1400 prolaza po exportu) i uvoz bi trajao desecima minuta.
+- Insert je bulk (`db.execute(insert(Model), [dict,...])`) - ORM add() po retku je presporo
+  na ~3300 redaka x 62 exporta.
+- `preracunaj_iz_arhive(db)` ponovno izracuna SVE snapshote iz sirovih .xlsx u uploads/ (bez
+  ponovnog uploada) - koristi se kad se promijeni logika. Traje ~4 min za 62 exporta.
+- Detalj (`/nabava/artikl/{sifra}`) radi i kad `a` (Artikl) je None: nema minimuma/linije praga,
+  umjesto "Uredi sifru" nudi "+ Dodaj u pracene" (prefill preko `?sifra=`).
+- Micanje s popisa pracenih (`sifre/{id}/obrisi`) NE brise podatke materijala - samo postavi
+  artikl_id na NULL i obrise konfiguracijski red.
 
 ## Uvoz cijele mape + aktivni snapshot (v2)
 - `service.uvezi_iz_mape(db, mapa)` uveze SVE PAUK exporte iz mape (naziv sadrzi "STANJA
@@ -153,5 +172,7 @@ Datum exporta je tekst zaglavlja stupca 1 (npr. "22.04.2026. 08:26").
 - GitHub repo: **`Shywera/projekcija-potreba`** (vlastiti git repo, NE dio home repoa; uploads/
   + *.db gitignore). Bulk uvoz: 61 stvarni PAUK export iz Downloadsa (prosinac 2025 - srpanj 2026)
   -> bogat povijesni graf. Dogadjaji po-snapshotu (fix), zoom bez gumba (dvoklik reset).
+- 2026-07-22 (v3): pretraga po sifri/nazivu preko SVIH materijala + graf za bilo koju sifru.
+  Baza narasla na ~31MB (81k stanja, 131k dogadjaja, 62 snapshota).
 - Sljedeće / ideje: PDF/Excel izvoz ako zatreba, filter "samo za naručiti", trend agregat na
   dashboardu. Namjerno odgođeno.

@@ -1,16 +1,22 @@
 {% extends "base.html" %}
-{% block title %}{{ a.sifra }} · Nabava{% endblock %}
+{% block title %}{{ sifra }} · Nabava{% endblock %}
 {% block content %}
 
 <a href="/nabava" class="text-sm hover:underline" style="color:var(--blue)">&larr; Natrag na nadzornu ploču</a>
 
 <div class="mt-2 mb-5 flex items-start justify-between flex-wrap gap-2">
     <div>
-        <h1 class="text-xl font-bold mono tracking-tight">{{ a.sifra }}</h1>
+        <h1 class="text-xl font-bold mono tracking-tight">{{ sifra }}</h1>
         <p style="color:var(--ink-2)">{{ stanje.naziv if stanje else '(nije pronađeno u trenutnom exportu)' }}</p>
-        <p class="text-xs mt-0.5" style="color:var(--muted)">{{ a.kategorija }} · dobavljač: {{ stanje.dobavljac if stanje else '–' }}</p>
+        <p class="text-xs mt-0.5" style="color:var(--muted)">
+            {% if a %}{{ a.kategorija }}{% else %}nije na popisu praćenih{% endif %} · dobavljač: {{ stanje.dobavljac if stanje else '–' }}
+        </p>
     </div>
+    {% if a %}
     <a href="/nabava/sifre/{{ a.id }}/uredi" class="text-sm px-3 py-1.5 rounded-lg border hover:bg-gray-50" style="border-color:var(--hairline)">Uredi šifru</a>
+    {% else %}
+    <a href="/nabava/sifre/nova?sifra={{ sifra }}" class="text-sm px-3 py-1.5 rounded-lg text-white font-semibold" style="background:var(--blue)">+ Dodaj u praćene</a>
+    {% endif %}
 </div>
 
 {% if not stanje %}
@@ -29,21 +35,22 @@
     {{ tile('Na skladištu', '%.2f'|format(stanje.stanje)) }}
     {{ tile('Slobodno', '%.2f'|format(stanje.nak_rn)) }}
     {{ tile('S naručenim', '%.2f'|format(stanje.nak_nar)) }}
-    {{ tile('Min', ('%.0f'|format(a.min_broj)) if a.min_tip=='BROJ' else ('> 0' if a.min_tip=='POSITIVE' else 'Σ≥3')) }}
+    {% if a %}{{ tile('Min', ('%.0f'|format(a.min_broj)) if a.min_tip=='BROJ' else ('> 0' if a.min_tip=='POSITIVE' else 'Σ≥3')) }}
+    {% else %}{{ tile('Min', '–') }}{% endif %}
     <div class="card px-4 py-3">
         <div class="text-xs" style="color:var(--muted)">Status</div>
         <div class="mt-1.5"><span class="badge badge-{{ stil.tip }}"><span class="dot"></span>{{ stil.oznaka }}</span></div>
     </div>
 </div>
 
-{% if stanje.fali > 0 %}
+{% if a and stanje.fali > 0 %}
 <div class="card px-4 py-2.5 mb-4 text-sm font-semibold flex items-center gap-2" style="color:#8c1414; background:#f8d5d5; border-color:#e09a9a">
     <span class="badge badge-critical"><span class="dot"></span>naruči</span>
     Treba naručiti: {% if a.min_tip in ('POSITIVE','COMB_3') %}HITNO{% else %}{{ '%.2f'|format(stanje.fali) }}{% endif %}
 </div>
 {% endif %}
 
-{% if a.min_tip == 'COMB_3' %}
+{% if a and a.min_tip == 'COMB_3' %}
 <div class="card px-4 py-2 mb-4 text-sm" style="color:#0a4489; background:var(--blue-soft); border-color:#9cc4ef">
     Dijeli zajednički minimum (zbroj Nak.Nar &ge; 3) sa: {{ sibling_krpe | join(', ') if sibling_krpe else '(nema drugih COMB_3 šifri)' }}. Zato graf nema liniju praga.
 </div>
@@ -106,7 +113,7 @@ const fmt = (m) => DT.fromMillis(m).toFormat('dd.MM.yy.');
 const povijest   = ({{ krivulja.povijest | tojson }}).map(p => ({x: ms(p.x), y: p.y}));
 const projekcija = ({{ krivulja.projekcija | tojson }}).map(p => ({x: ms(p.x), y: p.y}));
 const danasMs    = {{ krivulja.danas | tojson }} ? ms({{ krivulja.danas | tojson }}) : null;
-const minBroj    = {{ (a.min_broj if a.min_tip == 'BROJ' else none) | tojson }};
+const minBroj    = {{ (a.min_broj if (a and a.min_tip == 'BROJ') else none) | tojson }};
 
 const svi = povijest.concat(projekcija);
 if (svi.length) {

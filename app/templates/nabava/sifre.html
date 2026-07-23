@@ -26,7 +26,7 @@
             {% for a in artikli %}
             <tr>
                 <td class="mono text-xs" style="color:var(--ink-2)">{{ a.sifra }}</td>
-                <td class="truncate">{{ naziv_po_id.get(a.id) or '' }}</td>
+                <td class="truncate">{{ naziv_po_sifri.get(a.sifra) or '' }}</td>
                 <td>
                     {% if a.min_tip == 'BROJ' %}{{ '%.0f'|format(a.min_broj) }}
                     {% elif a.min_tip == 'POSITIVE' %}&gt; 0{% else %}Σ&ge;3 (zajednički){% endif %}

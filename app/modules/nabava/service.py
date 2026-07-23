@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import select
+from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
 from app.modules.nabava import pauk
@@ -48,6 +48,43 @@ def izracunaj_suma_krpe(artikli: list[Artikl], nak_nar_po_sifri: dict[str, float
     """Dinamicki zbroj nak_nar svih trenutno COMB_3-oznacenih sifri (npr. krpe za pranje) -
     ne fiksne dvije sifre kao u prvotnoj desktop verziji (taj bug je vec ispravljen u 0.4)."""
     return sum(nak_nar_po_sifri.get(a.sifra, 0.0) for a in artikli if a.min_tip == "COMB_3")
+
+
+def dogadjaji_po_sifri(df_nal: pd.DataFrame, df_nar: pd.DataFrame) -> dict[str, list[dict]]:
+    """SVI dogadjaji odjednom, grupirani po sifri - jedan prolaz kroz podatke.
+
+    Zamjena za pozivanje dogadjaji_za_sifru() po svakoj sifri: to filtrira cijeli DataFrame
+    za svaku sifru posebno, sto je bilo podnosljivo za 52 pracena artikla, ali za SVE
+    materijale (~1300) znaci 1300 punih prolaza po exportu -> uvoz bi trajao desecima minuta.
+    """
+    rez: dict[str, list[dict]] = {}
+
+    if not df_nal.empty:                                    # TROSENJE (radni nalozi)
+        datumi = pd.to_datetime(df_nal.iloc[:, pauk.C_ROK], errors="coerce")
+        preostalo = (pd.to_numeric(df_nal.iloc[:, pauk.C_KOL], errors="coerce").fillna(0)
+                     - pd.to_numeric(df_nal.iloc[:, pauk.C_ZADUZ], errors="coerce").fillna(0)).clip(lower=0)
+        for s, d, k, izv in zip(df_nal.iloc[:, pauk.C_SIFRA], datumi, preostalo,
+                                df_nal.iloc[:, pauk.C_RN]):
+            if pd.isna(d) or k <= 0:
+                continue
+            rez.setdefault(str(s), []).append(
+                {"datum": d, "kolicina": -float(k), "tip": "TROSENJE",
+                 "izvor": str(izv) if pd.notna(izv) else None})
+
+    if not df_nar.empty:                                    # DOLAZAK (narudzbe)
+        datumi = pd.to_datetime(df_nar.iloc[:, pauk.C_ROK_NARUDZBA], errors="coerce")
+        kolicine = pd.to_numeric(df_nar.iloc[:, pauk.C_KOL_NARUDZBA], errors="coerce").fillna(0)
+        for s, d, k, izv in zip(df_nar.iloc[:, pauk.C_SIFRA], datumi, kolicine,
+                                df_nar.iloc[:, pauk.C_BR_NARUDZBE]):
+            if pd.isna(d) or k <= 0:
+                continue
+            rez.setdefault(str(s), []).append(
+                {"datum": d, "kolicina": float(k), "tip": "DOLAZAK",
+                 "izvor": str(izv) if pd.notna(izv) else None})
+
+    for lista in rez.values():
+        lista.sort(key=lambda x: x["datum"])
+    return rez
 
 
 def dogadjaji_za_sifru(sifra: str, df_nal: pd.DataFrame, df_nar: pd.DataFrame) -> list[dict]:
@@ -226,11 +263,13 @@ def obradi_upload(db: Session, filename: str, data: bytes) -> Snapshot:
     df_nar = pauk.df_narudzbe(df)
 
     artikli = list(db.scalars(select(Artikl).order_by(Artikl.redoslijed)).all())
+    artikl_po_sifri = {a.sifra: a for a in artikli}
     nak_nar_po_sifri = {
         a.sifra: f(sklad[a.sifra].iloc[pauk.C_NAK_NAR])
         for a in artikli if a.sifra in sklad
     }
     suma_krpe = izracunaj_suma_krpe(artikli, nak_nar_po_sifri)
+    svi_dogadjaji = dogadjaji_po_sifri(df_nal, df_nar)   # jedan prolaz za sve sifre
 
     spremljeni_file: Path | None = None
     try:
@@ -270,24 +309,25 @@ def obradi_upload(db: Session, filename: str, data: bytes) -> Snapshot:
         #    (Prije se brisalo sve pa reinsertalo za "aktivni"; ali kod bulk uvoza zadnji obradjeni
         #    file != aktivni po datumu, pa su dogadjaji ostajali vezani uz krivi snapshot i
         #    projekcija je nestajala. Po-snapshotu je jednostavno i tocno.)
-        for a in artikli:
-            if a.sifra not in sklad:
-                continue  # ostaje bez StanjeSnapshot reda -> vidljivo kao "nije u exportu"
-
-            red = sklad[a.sifra]
+        #    v3: prolazi se kroz SVE materijale iz exporta (~1300), ne samo pracene - da se
+        #    moze pretraziti i nacrtati graf za bilo koju sifru. `artikl_id` je None za one
+        #    izvan popisa pracenih; `fali` se racuna samo za pracene (ostali nemaju minimum).
+        redovi_stanja, redovi_dogadjaja = [], []
+        for sifra, red in sklad.items():
+            a = artikl_po_sifri.get(sifra)
             stanje = f(red.iloc[pauk.C_STANJE])
             nak_rn = f(red.iloc[pauk.C_NAK_RN])
-            nak_nar = nak_nar_po_sifri[a.sifra]
+            nak_nar = f(red.iloc[pauk.C_NAK_NAR])
 
-            fali = izracunaj_fali(a.min_tip, a.min_broj, nak_nar, suma_krpe)
-            dogadjaji = dogadjaji_za_sifru(a.sifra, df_nal, df_nar)
+            fali = izracunaj_fali(a.min_tip, a.min_broj, nak_nar, suma_krpe) if a else 0.0
+            dogadjaji = svi_dogadjaji.get(sifra, [])
             proj = projekcija_puna(stanje, dogadjaji, danas)
 
             zavrsna = stanje + sum(d["kolicina"] for d in dogadjaji)
             odstupa = provjeri_odstupanje(zavrsna, nak_nar)
 
-            db.add(StanjeSnapshot(
-                snapshot_id=snap.id, artikl_id=a.id, sifra=a.sifra,
+            redovi_stanja.append(dict(
+                snapshot_id=snap.id, artikl_id=(a.id if a else None), sifra=sifra,
                 naziv=str(red.iloc[pauk.C_NAZIV]), dobavljac=str(red.iloc[pauk.C_DOBAV]),
                 stanje=stanje, nak_rn=nak_rn, nak_nar=nak_nar, fali=fali,
                 status=proj["status"],
@@ -299,9 +339,16 @@ def obradi_upload(db: Session, filename: str, data: bytes) -> Snapshot:
                 odstupa_od_erp=odstupa,
             ))
             for dd in dogadjaji:
-                db.add(Dogadjaj(snapshot_id=snap.id, artikl_id=a.id, sifra=a.sifra,
-                                datum=dd["datum"].to_pydatetime(),
-                                kolicina=dd["kolicina"], tip=dd["tip"], izvor=dd["izvor"]))
+                redovi_dogadjaja.append(dict(
+                    snapshot_id=snap.id, artikl_id=(a.id if a else None), sifra=sifra,
+                    datum=dd["datum"].to_pydatetime(),
+                    kolicina=dd["kolicina"], tip=dd["tip"], izvor=dd["izvor"]))
+
+        # bulk insert (ORM add() po retku bi na ~3300 redaka x 62 exporta bio presporo)
+        if redovi_stanja:
+            db.execute(insert(StanjeSnapshot), redovi_stanja)
+        if redovi_dogadjaja:
+            db.execute(insert(Dogadjaj), redovi_dogadjaja)
 
         _postavi_aktivni_najnoviji(db)
         db.commit()
@@ -326,6 +373,76 @@ def _postavi_aktivni_najnoviji(db: Session) -> None:
     if snap is not None:
         db.query(Snapshot).update({Snapshot.aktivan: False})
         snap.aktivan = True
+
+
+def preracunaj_iz_arhive(db: Session) -> dict:
+    """Ponovno izracuna SVE snapshote iz sirovih .xlsx spremljenih u uploads/, bez ponovnog
+    uploada. Koristi se kad se promijeni logika izracuna (npr. prelazak na spremanje svih
+    materijala) - povijest ostaje ista jer su izvorni exporti sacuvani.
+    Postojeci Snapshot redovi se ZADRZAVAJU (datumi/datoteke), samo se derivirani podaci
+    (StanjeSnapshot/Dogadjaj) obrisu i ponovno izracunaju."""
+    rez = {"preracunato": 0, "greske": []}
+    snapshoti = list(db.scalars(select(Snapshot).order_by(Snapshot.datum_exporta)).all())
+    artikli = list(db.scalars(select(Artikl)).all())
+    artikl_po_sifri = {a.sifra: a for a in artikli}
+
+    for snap in snapshoti:
+        if not snap.datoteka or not Path(snap.datoteka).exists():
+            rez["greske"].append((snap.izvor_naziv, "nema spremljene datoteke"))
+            continue
+        try:
+            data = Path(snap.datoteka).read_bytes()
+            df = pauk.ucitaj_i_normaliziraj(data)
+            danas = (pd.Timestamp(snap.datum_exporta.date()) if snap.datum_exporta
+                     else pd.Timestamp(snap.ucitano_at.date()))
+            sklad = pauk.sklad_po_sifri(df)
+            svi_dog = dogadjaji_po_sifri(pauk.df_nalozi(df), pauk.df_narudzbe(df))
+            nak_nar_po_sifri = {a.sifra: f(sklad[a.sifra].iloc[pauk.C_NAK_NAR])
+                                for a in artikli if a.sifra in sklad}
+            suma_krpe = izracunaj_suma_krpe(artikli, nak_nar_po_sifri)
+
+            db.query(StanjeSnapshot).filter(StanjeSnapshot.snapshot_id == snap.id).delete()
+            db.query(Dogadjaj).filter(Dogadjaj.snapshot_id == snap.id).delete()
+
+            stanja, dogadjaji_r = [], []
+            for sifra, red in sklad.items():
+                a = artikl_po_sifri.get(sifra)
+                stanje = f(red.iloc[pauk.C_STANJE])
+                nak_nar = f(red.iloc[pauk.C_NAK_NAR])
+                dog = svi_dog.get(sifra, [])
+                proj = projekcija_puna(stanje, dog, danas)
+                stanja.append(dict(
+                    snapshot_id=snap.id, artikl_id=(a.id if a else None), sifra=sifra,
+                    naziv=str(red.iloc[pauk.C_NAZIV]), dobavljac=str(red.iloc[pauk.C_DOBAV]),
+                    stanje=stanje, nak_rn=f(red.iloc[pauk.C_NAK_RN]), nak_nar=nak_nar,
+                    fali=(izracunaj_fali(a.min_tip, a.min_broj, nak_nar, suma_krpe) if a else 0.0),
+                    status=proj["status"],
+                    prvi_pad_datum=proj["datum"].to_pydatetime() if proj["datum"] is not None else None,
+                    prvi_pad_dani=proj["dani"], oporavlja_li_se=proj["oporavlja_li_se"],
+                    datum_oporavka=(proj["datum_oporavka"].to_pydatetime()
+                                    if proj["datum_oporavka"] is not None else None),
+                    odstupa_od_erp=provjeri_odstupanje(
+                        stanje + sum(d["kolicina"] for d in dog), nak_nar),
+                ))
+                for dd in dog:
+                    dogadjaji_r.append(dict(
+                        snapshot_id=snap.id, artikl_id=(a.id if a else None), sifra=sifra,
+                        datum=dd["datum"].to_pydatetime(), kolicina=dd["kolicina"],
+                        tip=dd["tip"], izvor=dd["izvor"]))
+
+            if stanja:
+                db.execute(insert(StanjeSnapshot), stanja)
+            if dogadjaji_r:
+                db.execute(insert(Dogadjaj), dogadjaji_r)
+            db.commit()
+            rez["preracunato"] += 1
+        except Exception as e:
+            db.rollback()
+            rez["greske"].append((snap.izvor_naziv, str(e)))
+
+    _postavi_aktivni_najnoviji(db)
+    db.commit()
+    return rez
 
 
 def uvezi_iz_mape(db: Session, mapa: Path) -> dict:
@@ -382,13 +499,14 @@ def _snapshot_datum(snap: Snapshot) -> datetime:
     return snap.datum_exporta or snap.ucitano_at
 
 
-def povijest_stanja(db: Session, artikl_id: int) -> list[dict]:
+def povijest_stanja(db: Session, sifra: str) -> list[dict]:
     """Stvarno IZMJERENO stanje kroz sve uploade za jednu sifru - jedan podatak po snapshotu
-    na njegov datum exporta. Osnova povijesnog dijela kombinirane krivulje."""
+    na njegov datum exporta. Osnova povijesnog dijela kombinirane krivulje.
+    Kljuc je SIFRA (ne artikl_id) - radi i za materijale izvan popisa pracenih."""
     redci = db.execute(
         select(Snapshot, StanjeSnapshot)
         .join(StanjeSnapshot, StanjeSnapshot.snapshot_id == Snapshot.id)
-        .where(StanjeSnapshot.artikl_id == artikl_id)
+        .where(StanjeSnapshot.sifra == sifra)
     ).all()
     tocke = [{"datum": _snapshot_datum(s), "stanje": ss.stanje, "nak_nar": ss.nak_nar}
              for s, ss in redci]
@@ -396,13 +514,13 @@ def povijest_stanja(db: Session, artikl_id: int) -> list[dict]:
     return tocke
 
 
-def kombinirana_krivulja(db: Session, artikl_id: int, aktivni: Snapshot,
+def kombinirana_krivulja(db: Session, sifra: str, aktivni: Snapshot,
                          stanje_akt: StanjeSnapshot | None) -> dict:
     """Spaja STVARNU POVIJEST (izmjereno stanje kroz proslе uploade) + PROJEKCIJU unaprijed
     (od zadnjeg stanja, iz dogadjaja aktivnog snapshota) u jednu vremensku os. Zadnja
     povijesna tocka i prva projekcijska su isti (x=danas, y=zadnje stanje) -> spoj bez rupe.
     Vraca {povijest:[{x,y}], projekcija:[{x,y}], danas:iso} za Chart.js."""
-    povijest_raw = povijest_stanja(db, artikl_id)
+    povijest_raw = povijest_stanja(db, sifra)
     danas = pd.Timestamp(_snapshot_datum(aktivni).date())
 
     # povijesne tocke STROGO prije danas (zadnja=danas dolazi iz projekcije, da se spoje)
@@ -412,7 +530,7 @@ def kombinirana_krivulja(db: Session, artikl_id: int, aktivni: Snapshot,
     projekcija: list[dict] = []
     if stanje_akt is not None:
         dogadjaji = list(db.scalars(
-            select(Dogadjaj).where(Dogadjaj.artikl_id == artikl_id,
+            select(Dogadjaj).where(Dogadjaj.sifra == sifra,
                                     Dogadjaj.snapshot_id == aktivni.id)
         ).all())
         dog_dict = [{"datum": pd.Timestamp(d.datum), "kolicina": d.kolicina} for d in dogadjaji]

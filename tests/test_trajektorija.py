@@ -140,10 +140,10 @@ def test_povijest_i_kombinirana_krivulja_spoj_bez_rupe(db):
                     datum=datetime(2026, 7, 25), kolicina=-400, tip="TROSENJE"))
     db.flush()
 
-    pov = service.povijest_stanja(db, a.id)
+    pov = service.povijest_stanja(db, "X1")
     assert [round(p["stanje"]) for p in pov] == [500, 300]
 
-    kr = service.kombinirana_krivulja(db, a.id, s2, ss2)
+    kr = service.kombinirana_krivulja(db, "X1", s2, ss2)
     # povijest zavrsava na danas s trenutnim stanjem; projekcija pocinje na istoj tocki
     assert kr["danas"] == "2026-07-21"
     assert kr["povijest"][-1] == {"x": "2026-07-21", "y": 300.0}
@@ -170,7 +170,7 @@ def test_dedup_istog_exporta_ne_duplicira_povijest(db, tmp_path, monkeypatch):
     service.obradi_upload(db, fn, data)
     service.obradi_upload(db, fn, data)  # isti export drugi put
     assert db.scalar(select(func.count(Snapshot.id))) == 1  # NE 2
-    assert len(service.povijest_stanja(db, a.id)) == 1       # jedna povijesna tocka
+    assert len(service.povijest_stanja(db, "5010101070100015")) == 1       # jedna povijesna tocka
 
 
 def test_stariji_export_ne_krade_aktivni(db, tmp_path, monkeypatch):
@@ -218,7 +218,7 @@ def test_kombinirana_bez_povijesti_samo_projekcija(db):
     ss = StanjeSnapshot(snapshot_id=s.id, artikl_id=a.id, sifra="X2", stanje=200, nak_nar=200)
     db.add(ss); db.flush()
 
-    kr = service.kombinirana_krivulja(db, a.id, s, ss)
+    kr = service.kombinirana_krivulja(db, "X2", s, ss)
     # samo jedan snapshot -> nema povijesnih tocaka prije danas, projekcija krece od stanja
     assert kr["povijest"] == []
     assert kr["projekcija"][0] == {"x": "2026-07-21", "y": 200.0}

@@ -13,6 +13,8 @@ dolazak robe (narudžbe) u jednu krivulju pa se točno vidi kada i zašto nešto
 
 ## Mogućnosti
 
+- **Pretraga po šifri ili nazivu** - traži među SVIM materijalima iz exporta (ne samo praćenim)
+  i odmah dobiješ graf/izvještaj za bilo koji; jednim klikom ga možeš dodati u praćene
 - **Rekapitulacija za nabavu** - što treba naručiti, grupirano po dobavljaču
 - **Povijesni + projekcijski graf** - po artiklu, u jednoj vremenskoj osi: stvarno izmjereno
   stanje iz prošlih uploada (povijest) koje se nastavlja u projekciju unaprijed (trošenje +

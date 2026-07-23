@@ -48,6 +48,24 @@ def _migracija() -> None:
         with engine.begin() as conn:
             conn.execute(text(sql))
 
+    # v2->v3: artikl_id postaje NULLABLE (spremamo SVE materijale iz exporta, ne samo pracene).
+    # SQLite ne moze ALTER COLUMN, pa se te dvije tablice rekreiraju - podaci su regenerabilni
+    # iz sirovih .xlsx u uploads/ (vidi service.preracunaj_iz_arhive, pokrece se nize).
+    insp2 = sa_inspect(engine)
+    tab2 = set(insp2.get_table_names())
+    treba_preracun = False
+    for tablica in ("stanje_snapshot", "dogadjaj"):
+        if tablica not in tab2:
+            continue
+        stupac = next((c for c in insp2.get_columns(tablica) if c["name"] == "artikl_id"), None)
+        if stupac is not None and not stupac["nullable"]:
+            with engine.begin() as conn:
+                conn.execute(text(f"DROP TABLE {tablica}"))
+            treba_preracun = True
+    if treba_preracun:
+        Base.metadata.create_all(bind=engine)   # ponovno kreiraj s novom shemom
+        print("[Nabava] Shema azurirana (svi materijali). Preracunavam arhivu iz uploads/...")
+
     # Jednokratna, non-destruktivna migracija v1 podataka: ako je nova stanje_snapshot prazna
     # a stari artikl_stanje postoji -> preslikaj retke (vezano uz postojeci/aktivni snapshot),
     # pa dropaj deprecated tablicu. Tako v1 test-snapshot postane 1. povijesna tocka.
@@ -75,10 +93,22 @@ def _migracija() -> None:
                                  {"i": snap_id})
             conn.execute(text("DROP TABLE artikl_stanje"))
 
+    return treba_preracun
 
-_migracija()
+
+_treba_preracun = _migracija()
 seed_artikli_ako_prazno()
 uploads_dir()  # osiguraj da uploads/ postoji
+
+if _treba_preracun:
+    from app.core.database import SessionLocal
+    from app.modules.nabava.service import preracunaj_iz_arhive
+    _db = SessionLocal()
+    try:
+        _r = preracunaj_iz_arhive(_db)
+        print(f"[Nabava] Preracunato snapshota: {_r['preracunato']}, greske: {len(_r['greske'])}")
+    finally:
+        _db.close()
 
 app = FastAPI(title="Nabava", docs_url="/api-docs", redoc_url=None)
 app.include_router(nabava_router)

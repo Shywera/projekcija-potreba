@@ -23,7 +23,7 @@
 
     <div>
         <label class="block text-sm font-medium mb-1">Šifra</label>
-        <input type="text" name="sifra" required value="{{ a.sifra if a else '' }}"
+        <input type="text" name="sifra" required value="{{ a.sifra if a else (prefill_sifra or '') }}"
                class="w-full border rounded-lg px-3 py-2 text-sm mono" style="border-color:var(--hairline)">
     </div>
 

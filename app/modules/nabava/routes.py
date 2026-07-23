@@ -46,15 +46,18 @@ def dashboard(request: Request, snapshot: int | None = None, db: Session = Depen
     ukupno_snapshota = db.scalar(select(func.count(Snapshot.id))) or 0
 
     artikli = list(db.scalars(select(Artikl).order_by(Artikl.redoslijed)).all())
-    stanja_po_id = {}
-    if snap:
-        stanja_po_id = {s.artikl_id: s for s in db.scalars(
-            select(StanjeSnapshot).where(StanjeSnapshot.snapshot_id == snap.id)
+    # kljuc je SIFRA (ne artikl_id) - snapshot sad sadrzi i materijale izvan popisa pracenih
+    # kojima je artikl_id None, pa bi kljucanje po artikl_id sve njih sudaralo na None.
+    stanja_po_sifri = {}
+    if snap and artikli:
+        stanja_po_sifri = {s.sifra: s for s in db.scalars(
+            select(StanjeSnapshot).where(StanjeSnapshot.snapshot_id == snap.id,
+                                          StanjeSnapshot.sifra.in_([a.sifra for a in artikli]))
         ).all()}
 
     redci = []
     for a in artikli:
-        st = stanja_po_id.get(a.id)
+        st = stanja_po_sifri.get(a.sifra)
         stil = service.stil_statusa(st.status, st.prvi_pad_dani, st.oporavlja_li_se) if st else None
         redci.append({"kategorija": a.kategorija, "artikl": a, "stanje": st, "stil": stil})
 
@@ -76,6 +79,32 @@ def dashboard(request: Request, snapshot: int | None = None, db: Session = Depen
         "broj_naruci": broj_naruci, "broj_pada": broj_pada, "broj_artikala": len(artikli),
         "ukupno_snapshota": ukupno_snapshota,
         "gleda_stari": bool(snapshot) and snap is not None and not snap.aktivan,
+    })
+
+
+# ─── Pretraga po sifri/nazivu (SVI materijali iz exporta, ne samo praceni) ──
+
+@router.get("/trazi", response_class=HTMLResponse)
+def trazi(request: Request, q: str = "", db: Session = Depends(get_db)):
+    q = (q or "").strip()
+    snap = service.aktivni_snapshot(db)
+    rezultati, previse = [], False
+    if q and snap:
+        uzorak = f"%{q}%"
+        redci = list(db.scalars(
+            select(StanjeSnapshot)
+            .where(StanjeSnapshot.snapshot_id == snap.id)
+            .where(StanjeSnapshot.sifra.like(uzorak) | StanjeSnapshot.naziv.ilike(uzorak))
+            .order_by(StanjeSnapshot.sifra).limit(201)
+        ).all())
+        previse = len(redci) > 200
+        redci = redci[:200]
+        praceni = {a.sifra for a in db.scalars(select(Artikl)).all()}
+        rezultati = [{"st": r, "praceni": r.sifra in praceni,
+                      "stil": service.stil_statusa(r.status, r.prvi_pad_dani, r.oporavlja_li_se)}
+                     for r in redci]
+    return templates.TemplateResponse(request, "nabava/trazi.html", {
+        "q": q, "rezultati": rezultati, "previse": previse, "snapshot": snap,
     })
 
 
@@ -181,19 +210,21 @@ def sifre_popis(request: Request, db: Session = Depends(get_db)):
     grupe = service.grupiraj_po_kategoriji(artikli)
     # nazivi dolaze iz aktivnog exporta (StanjeSnapshot), ne iz konfiguracije
     snap = service.aktivni_snapshot(db)
-    naziv_po_id = {}
-    if snap:
-        naziv_po_id = {s.artikl_id: s.naziv for s in db.scalars(
-            select(StanjeSnapshot).where(StanjeSnapshot.snapshot_id == snap.id)).all()}
+    naziv_po_sifri = {}
+    if snap and artikli:
+        naziv_po_sifri = {s.sifra: s.naziv for s in db.scalars(
+            select(StanjeSnapshot).where(StanjeSnapshot.snapshot_id == snap.id,
+                                          StanjeSnapshot.sifra.in_([a.sifra for a in artikli]))).all()}
     return templates.TemplateResponse(request, "nabava/sifre.html",
-                                      {"grupe": grupe, "naziv_po_id": naziv_po_id})
+                                      {"grupe": grupe, "naziv_po_sifri": naziv_po_sifri})
 
 
 @router.get("/sifre/nova", response_class=HTMLResponse)
-def sifra_nova_forma(request: Request, db: Session = Depends(get_db)):
+def sifra_nova_forma(request: Request, sifra: str = "", db: Session = Depends(get_db)):
     sljedeci = (db.scalar(select(func.max(Artikl.redoslijed))) or 0) + 10
     return templates.TemplateResponse(request, "nabava/sifre_forma.html", {
-        "a": None, "kategorije": _kategorije(db), "sljedeci_redoslijed": sljedeci, "greska": None,
+        "a": None, "kategorije": _kategorije(db), "sljedeci_redoslijed": sljedeci,
+        "greska": None, "prefill_sifra": sifra,   # iz pretrage: "dodaj u pracene"
     })
 
 
@@ -252,10 +283,15 @@ async def sifra_uredi_spremi(artikl_id: int, request: Request, db: Session = Dep
 
 @router.post("/sifre/{artikl_id}/obrisi")
 def sifra_obrisi(artikl_id: int, db: Session = Depends(get_db)):
+    """Micanje s popisa PRACENIH ne brise podatke o materijalu - oni ostaju u arhivi
+    (materijal i dalje postoji u exportu i moze mu se pogledati graf kroz pretragu).
+    Samo se raskine veza (artikl_id -> None) pa obrise konfiguracijski red."""
     a = db.get(Artikl, artikl_id)
     if a is not None:
-        db.query(StanjeSnapshot).filter(StanjeSnapshot.artikl_id == artikl_id).delete()
-        db.query(Dogadjaj).filter(Dogadjaj.artikl_id == artikl_id).delete()
+        db.query(StanjeSnapshot).filter(StanjeSnapshot.artikl_id == artikl_id)\
+            .update({StanjeSnapshot.artikl_id: None})
+        db.query(Dogadjaj).filter(Dogadjaj.artikl_id == artikl_id)\
+            .update({Dogadjaj.artikl_id: None})
         db.delete(a)
         db.commit()
     return RedirectResponse("/nabava/sifre", status_code=303)
@@ -265,9 +301,9 @@ def sifra_obrisi(artikl_id: int, db: Session = Depends(get_db)):
 
 @router.get("/artikl/{sifra}", response_class=HTMLResponse)
 def artikl_detalj(sifra: str, request: Request, db: Session = Depends(get_db)):
+    # `a` (konfiguracija) moze biti None - detalj radi i za materijale IZVAN popisa pracenih
+    # (tada nema minimuma pa ni linije praga; sve ostalo - graf, povijest, dogadjaji - radi).
     a = db.scalar(select(Artikl).where(Artikl.sifra == sifra))
-    if a is None:
-        return RedirectResponse("/nabava", status_code=303)
 
     snap = service.aktivni_snapshot(db)
     st = None
@@ -276,22 +312,25 @@ def artikl_detalj(sifra: str, request: Request, db: Session = Depends(get_db)):
     stil = None
     if snap:
         st = db.scalar(select(StanjeSnapshot).where(
-            StanjeSnapshot.artikl_id == a.id, StanjeSnapshot.snapshot_id == snap.id))
+            StanjeSnapshot.sifra == sifra, StanjeSnapshot.snapshot_id == snap.id))
         dogadjaji = list(db.scalars(
-            select(Dogadjaj).where(Dogadjaj.artikl_id == a.id, Dogadjaj.snapshot_id == snap.id)
+            select(Dogadjaj).where(Dogadjaj.sifra == sifra, Dogadjaj.snapshot_id == snap.id)
             .order_by(Dogadjaj.datum)
         ).all())
-        krivulja = service.kombinirana_krivulja(db, a.id, snap, st)
+        krivulja = service.kombinirana_krivulja(db, sifra, snap, st)
         if st:
             stil = service.stil_statusa(st.status, st.prvi_pad_dani, st.oporavlja_li_se)
 
+    if a is None and st is None:
+        return RedirectResponse("/nabava/trazi?q=" + sifra, status_code=303)
+
     sibling_krpe = []
-    if a.min_tip == "COMB_3":
+    if a is not None and a.min_tip == "COMB_3":
         sibling_krpe = [x.sifra for x in db.scalars(
             select(Artikl).where(Artikl.min_tip == "COMB_3", Artikl.id != a.id)
         ).all()]
 
     return templates.TemplateResponse(request, "nabava/detalj.html", {
-        "a": a, "stanje": st, "stil": stil, "dogadjaji": dogadjaji, "krivulja": krivulja,
-        "sibling_krpe": sibling_krpe, "snapshot": snap,
+        "a": a, "sifra": sifra, "stanje": st, "stil": stil, "dogadjaji": dogadjaji,
+        "krivulja": krivulja, "sibling_krpe": sibling_krpe, "snapshot": snap,
     })

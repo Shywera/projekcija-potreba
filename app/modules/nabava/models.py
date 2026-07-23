@@ -41,14 +41,18 @@ class Snapshot(Base):
 
 
 class StanjeSnapshot(Base):
-    """Izracunati brojevi po (snapshot, artikl). v2: AKUMULIRA se kroz sve uploade (ne wipe
-    kao v1 ArtiklStanje) - dashboard cita retke aktivnog snapshota, a povijesni graf cita
-    stanje/nak_nar kroz sve snapshote za jednu sifru."""
+    """Izracunati brojevi po (snapshot, MATERIJAL). AKUMULIRA se kroz sve uploade - dashboard
+    cita retke aktivnog snapshota, povijesni graf cita stanje kroz sve snapshote za jednu sifru.
+
+    v3: sprema se za SVE materijale iz exporta (~1300), ne samo za 52 pracena - da se moze
+    pretraziti i nacrtati graf za bilo koju sifru. Zato je `artikl_id` NULLABLE (materijal
+    koji nije na popisu pracenih nema Artikl red); pravi kljuc je `sifra`.
+    """
     __tablename__ = "stanje_snapshot"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshot.id"), index=True)
-    artikl_id: Mapped[int] = mapped_column(ForeignKey("artikl.id"), index=True)
+    artikl_id: Mapped[int | None] = mapped_column(ForeignKey("artikl.id"), index=True, nullable=True)
     sifra: Mapped[str] = mapped_column(String(50), index=True)
 
     naziv: Mapped[str | None] = mapped_column(String(300), nullable=True)
@@ -79,7 +83,8 @@ class Dogadjaj(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("snapshot.id"), index=True)
-    artikl_id: Mapped[int] = mapped_column(ForeignKey("artikl.id"), index=True)
+    # nullable - dogadjaji se biljeze za SVE materijale, i one izvan popisa pracenih (v3)
+    artikl_id: Mapped[int | None] = mapped_column(ForeignKey("artikl.id"), index=True, nullable=True)
     sifra: Mapped[str] = mapped_column(String(50), index=True)
 
     datum: Mapped[datetime] = mapped_column(DateTime)
