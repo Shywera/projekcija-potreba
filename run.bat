@@ -12,7 +12,7 @@ rmdir /s /q ".venv" 2>nul
 
 :build
 echo [Nabava] Kreiram okruzenje i instaliram ovisnosti (jednom, ~1-2 min)...
-py -3 -m venv .venv
+py -3.14 -m venv .venv
 if errorlevel 1 goto nopy
 .venv\Scripts\python -m pip install --upgrade pip
 .venv\Scripts\python -m pip install -r requirements.txt
