@@ -21,7 +21,7 @@ if errorlevel 1 goto nopy
 echo.
 echo [Nabava] Pokrecem server na http://localhost:8602
 echo Za prekid: CTRL+C pa zatvori prozor.
-.venv\Scripts\uvicorn app.main:app --host 0.0.0.0 --port 8602
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8602
 echo.
 echo Server je zaustavljen.
 pause
